@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Asignación de Transporte</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #0056b3;
+        }
+        form div {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select, input[type="date"], input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Editar Asignación #{{ asignacion.id_asignacion }}</h1>
+
+        <form method="POST">
+            <div>
+                <label for="fecha">Fecha:</label>
+                <input type="date" id="fecha" name="fecha" value="{{ asignacion.fecha }}" required>
+            </div>
+            <div>
+                <label for="id_horario">Hora de Salida:</label>
+                <select id="id_horario" name="id_horario" required>
+                    <option value="">Selecciona una hora</option>
+                    {% for horario in horarios %}
+                    <option value="{{ horario.id_horario }}" {% if horario.id_horario == asignacion.id_horario %}selected{% endif %}>
+                        {{ horario.hora_salida }} ({{ horario.dias_semana }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="id_ruta">Ruta:</label>
+                <select id="id_ruta" name="id_ruta" required>
+                    <option value="">Selecciona una ruta</option>
+                    {% for ruta in rutas %}
+                    <option value="{{ ruta.id_ruta }}" {% if ruta.id_ruta == asignacion.id_ruta %}selected{% endif %}>
+                        {{ ruta.nombre }} - {{ ruta.recorrido }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="numero_camion">Número de Camión (Ingreso Manual):</label>
+                <input type="text" id="numero_camion" name="numero_camion" value="{{ asignacion.numero_camion_manual if asignacion.numero_camion_manual else '' }}" placeholder="Ej. C-001 o Camión Temporal">
+            </div>
+            <button type="submit">Actualizar Asignación</button>
+            <a href="{{ url_for('admin_dashboard') }}" class="back-link">Cancelar</a>
+        </form>
+
+        
+    </div>
+</body>
+</html>

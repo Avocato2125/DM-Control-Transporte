@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración de Transporte</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        h1, h2 {
+            color: #0056b3;
+        }
+        .actions {
+            margin-bottom: 20px;
+            display: flex; /* Para alinear los botones */
+            gap: 10px; /* Espacio entre los botones */
+            flex-wrap: wrap; /* Para que los botones se ajusten en pantallas pequeñas */
+        }
+        /* Estilos generales para todos los botones de acción */
+        .actions a, 
+        .actions button,
+        .action-buttons-group a, /* Aplica también a los botones de la tabla */
+        .action-buttons-group button {
+            display: inline-block;
+            padding: 8px 12px; /* Un poco más de padding */
+            font-size: 0.95em; /* Ligeramente más grande */
+            font-weight: bold; /* Negrita */
+            color: white;
+            text-decoration: none;
+            border-radius: 5px; /* Bordes redondeados */
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.1s ease; /* Transición suave */
+            text-align: center;
+        }
+        /* Efecto hover general */
+        .actions a:hover, 
+        .actions button:hover,
+        .action-buttons-group a:hover,
+        .action-buttons-group button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px); /* Pequeño levantamiento */
+        }
+
+        /* Estilos específicos para los botones principales (Crear, Ver, Limpiar) */
+        .actions .create-btn { /* Clase añadida para el botón Crear Nueva Asignación */
+            background-color: #28a745; /* Verde vibrante */
+        }
+        .actions .view-btn { /* Clase añadida para el botón Ver Pantalla */
+            background-color: #17a2b8; /* Azul claro para ver */
+        }
+        .actions .delete-all-btn {
+            background-color: #dc3545; /* Rojo para eliminar todo */
+        }
+
+        /* Estilos específicos para los botones de la tabla (Editar, Copiar, Eliminar) */
+        .action-buttons-group {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+        .action-buttons-group .edit-btn {
+            background-color: #007bff; /* Azul vibrante */
+        }
+        .action-buttons-group .copy-btn {
+            background-color: #ffc107; /* Amarillo para copiar */
+            color: #343a40; /* Texto oscuro para contraste */
+        }
+        .action-buttons-group .delete-single-btn {
+            background-color: #6c757d; /* Gris oscuro para eliminar individual */
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .flash-message {
+            padding: 10px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .flash-message.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .flash-message.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Panel de Administración de Transporte</h1>
+
+        {# Sección para mostrar mensajes flash (éxito/error) #}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="flash-message {{ category }}">{{ message }}</div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <div class="actions">
+            <a href="{{ url_for('nueva_asignacion') }}" class="create-btn">Crear Nueva Asignación</a>
+            <a href="{{ url_for('pantalla_personal') }}" target="_blank" class="view-btn">Ver Pantalla de Personal</a>
+            <form action="{{ url_for('limpiar_asignaciones') }}" method="POST" onsubmit="return confirm('¿Estás seguro de que quieres eliminar TODAS las asignaciones? Esta acción es irreversible.');">
+                <button type="submit" class="delete-all-btn">Limpiar Todas las Asignaciones</button>
+            </form>
+        </div>
+
+        <h2>Asignaciones de Rutas y Camiones</h2>
+        {% if asignaciones %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Hora Salida</th>
+                        <th>Días Aplicables</th>
+                        <th>Ruta</th>
+                        <th>Recorrido</th>
+                        <th>Camión Asignado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for asignacion in asignaciones %}
+                    <tr>
+                        <td>{{ asignacion.fecha }}</td>
+                        <td>{{ asignacion.hora_salida }}</td>
+                        <td>{{ asignacion.dias_semana }}</td>
+                        <td>{{ asignacion.nombre_ruta }}</td>
+                        <td>{{ asignacion.recorrido }}</td>
+                        <td>{{ asignacion.numero_camion_manual if asignacion.numero_camion_manual else 'Pendiente' }}</td>
+                        <td>
+                            <div class="action-buttons-group">
+                                {# Botón Editar #}
+                                <a href="{{ url_for('editar_asignacion', id_asignacion=asignacion.id_asignacion) }}" class="edit-btn">Editar</a>
+                                
+                                {# Botón Copiar #}
+                                <form action="{{ url_for('copiar_asignacion', id_asignacion=asignacion.id_asignacion) }}" method="POST" onsubmit="return confirm('¿Estás seguro de que quieres copiar esta asignación?');">
+                                    <button type="submit" class="copy-btn">Copiar</button>
+                                </form>
+
+                                {# Botón Eliminar #}
+                                <form action="{{ url_for('eliminar_asignacion', id_asignacion=asignacion.id_asignacion) }}" method="POST" onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta asignación?');">
+                                    <button type="submit" class="delete-single-btn">Eliminar</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p>No hay asignaciones programadas. ¡Crea una nueva!</p>
+        {% endif %}
+    </div>
+</body>
+</html>
