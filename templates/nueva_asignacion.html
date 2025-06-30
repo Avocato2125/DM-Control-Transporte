@@ -28,7 +28,7 @@
             margin-bottom: 5px;
             font-weight: bold;
         }
-        select, input[type="date"], input[type="text"] {
+        select, input[type="date"], input[type="text"] { /* Añadido input[type="text"] */
             width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
@@ -68,13 +68,8 @@
                 <input type="date" id="fecha" name="fecha" required>
             </div>
             <div>
-                <label for="id_horario">Hora de Salida:</label>
-                <select id="id_horario" name="id_horario" required>
-                    <option value="">Selecciona una hora</option>
-                    {% for horario in horarios %}
-                    <option value="{{ horario.id_horario }}">{{ horario.hora_salida }} ({{ horario.dias_semana }})</option>
-                    {% endfor %}
-                </select>
+                <label for="hora_salida_libre">Hora de Salida (Ej. 3:45 AM, 3:15 PM, 15:45):</label>
+                <input type="text" id="hora_salida_libre" name="hora_salida_libre" placeholder="Ej. 7:15 AM o 19:15" required>
             </div>
             <div>
                 <label for="id_ruta">Ruta:</label>
@@ -86,7 +81,7 @@
                 </select>
             </div>
             <div>
-                <label for="numero_camion">Número de Camión (Ingreso Manual):</label>
+                <label for="numero_camion">Número de Camión (Opcional):</label>
                 <input type="text" id="numero_camion" name="numero_camion" placeholder="Ej. C-001 o Camión Temporal">
             </div>
             <button type="submit">Guardar Asignación</button>

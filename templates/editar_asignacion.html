@@ -69,15 +69,8 @@
                 <input type="date" id="fecha" name="fecha" value="{{ asignacion.fecha }}" required>
             </div>
             <div>
-                <label for="id_horario">Hora de Salida:</label>
-                <select id="id_horario" name="id_horario" required>
-                    <option value="">Selecciona una hora</option>
-                    {% for horario in horarios %}
-                    <option value="{{ horario.id_horario }}" {% if horario.id_horario == asignacion.id_horario %}selected{% endif %}>
-                        {{ horario.hora_salida }} ({{ horario.dias_semana }})
-                    </option>
-                    {% endfor %}
-                </select>
+                <label for="hora_salida_libre">Hora de Salida (Ej. 3:45 AM, 3:15 PM, 15:45):</label>
+                <input type="text" id="hora_salida_libre" name="hora_salida_libre" value="{{ asignacion_hora_12h if asignacion_hora_12h else '' }}" placeholder="Ej. 7:15 AM o 19:15" required>
             </div>
             <div>
                 <label for="id_ruta">Ruta:</label>
@@ -91,7 +84,7 @@
                 </select>
             </div>
             <div>
-                <label for="numero_camion">Número de Camión (Ingreso Manual):</label>
+                <label for="numero_camion">Número de Camión (Opcional):</label>
                 <input type="text" id="numero_camion" name="numero_camion" value="{{ asignacion.numero_camion_manual if asignacion.numero_camion_manual else '' }}" placeholder="Ej. C-001 o Camión Temporal">
             </div>
             <button type="submit">Actualizar Asignación</button>

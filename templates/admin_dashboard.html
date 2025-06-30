@@ -111,6 +111,16 @@
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+        .action-buttons-group { /* Para alinear los botones de acción en la tabla */
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+        .action-buttons-group button {
+            padding: 5px 10px;
+            font-size: 0.85em;
+        }
     </style>
 </head>
 <body>
@@ -152,7 +162,7 @@
                     {% for asignacion in asignaciones %}
                     <tr>
                         <td>{{ asignacion.fecha }}</td>
-                        <td>{{ asignacion.hora_salida }}</td>
+                        <td>{{ asignacion.hora_salida_12h if asignacion.hora_salida_12h else asignacion.hora_salida }}</td> {# Usar hora_salida_12h #}
                         <td>{{ asignacion.dias_semana }}</td>
                         <td>{{ asignacion.nombre_ruta }}</td>
                         <td>{{ asignacion.recorrido }}</td>

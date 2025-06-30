@@ -319,8 +319,8 @@
     <div class="main-display">
         <div class="current-departure-container">
             {# Título de la sección de Salidas Programadas Ahora #}
-            {% if hora_activa_para_display and fecha_activa_para_display %}
-                <h2>¡Salidas Programadas Ahora! ({{ hora_activa_para_display }} - {{ fecha_activa_para_display }})</h2>
+            {% if hora_activa_para_display_12h and fecha_activa_para_display %}
+                <h2>¡Salidas Programadas Ahora! ({{ hora_activa_para_display_12h }} - {{ fecha_activa_para_display }})</h2>
             {% else %}
                 <h2>¡Salidas Programadas Ahora!</h2>
             {% endif %}
