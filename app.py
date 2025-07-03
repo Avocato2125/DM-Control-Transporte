@@ -54,35 +54,35 @@ def convert_to_12h(time_str_24h):
     except ValueError:
         return None
 
-# Función de ayuda para conectar a la base de datos (¡AHORA CONEXIÓN A POSTGRESQL!)
+# Función de ayuda para conectar a la base de datos (¡CONEXIÓN A POSTGRESQL!)
 def get_db_connection():
     # Verificamos si DATABASE_URL está configurada
     if not DATABASE_URL:
         logger.error("ERROR CRÍTICO: La variable de entorno 'DATABASE_URL' no está configurada para la conexión a DB.")
-        # Se lanza una excepción para que la aplicación no intente operar sin DB
         raise ValueError("DATABASE_URL no configurada para la base de datos PostgreSQL.")
     
     try:
         # Conexión a PostgreSQL usando la URL de la variable de entorno
         conn = psycopg2.connect(DATABASE_URL)
-        # Para que las filas se comporten como diccionarios (acceso por nombre de columna)
-        conn.cursor_factory = psycopg2.extras.RealDictCursor # ¡ESTA ES LA LÍNEA CRÍTICA Y CORREGIDA!
+        # Aquí NO configuramos conn.cursor_factory = RealDictCursor porque no se aplica a la conexión directa
+        # sino al cursor. Así que la línea que estaba mal en el código anterior era esa.
         
         logger.info("Conexión a la base de datos PostgreSQL exitosa.")
         return conn
     except Exception as e:
         logger.error(f"ERROR: Falló la conexión a la base de datos PostgreSQL: {e}", exc_info=True)
-        # Re-lanzar la excepción para que Flask la capture y muestre el error 500
         raise e 
 
 
 @app.route('/')
 def admin_dashboard():
-    # MODIFICADA: Ahora la conexión a DB puede fallar. Capturamos el error aquí.
+    conn = None # Inicializa conn para el finally
     try:
         conn = get_db_connection()
-        # Obtener las asignaciones. Obtenemos la hora_salida directamente de HorariosSalida
-        asignaciones_raw = conn.execute('''
+        # ¡CORRECCIÓN CLAVE! Crear un cursor y ejecutar en él.
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
+
+        asignaciones_raw = cursor.execute('''
             SELECT
                 A.id_asignacion,
                 HS.hora_salida, -- Obtenemos la hora_salida directamente de HorariosSalida
@@ -99,11 +99,12 @@ def admin_dashboard():
             WHERE A.fecha >= %s -- Usar %s para placeholders en psycopg2
             ORDER BY A.fecha, HS.hora_salida
         ''', (datetime.date.today().strftime('%Y-%m-%d'),)).fetchall()
-        conn.close()
+        
+        conn.close() 
 
         asignaciones = []
         for asignacion_row in asignaciones_raw:
-            # RealDictRow ya es un diccionario y mutable, no necesita dict()
+            # asignacion_row ya es un diccionario gracias a RealDictCursor
             asignacion_dict = asignacion_row 
             asignacion_dict['hora_salida_12h'] = convert_to_12h(asignacion_dict['hora_salida'])
             asignaciones.append(asignacion_dict)
@@ -112,19 +113,18 @@ def admin_dashboard():
     except Exception as e:
         logger.error(f"Error al cargar admin_dashboard: {e}", exc_info=True)
         flash(f"Error al cargar el panel de administración: {e}. ¿Base de datos inicializada?", 'error')
-        # Si la DB no está lista, renderizamos sin datos o con un mensaje de error
         return render_template('admin_dashboard.html', asignaciones=[]) 
 
 
 @app.route('/nueva_asignacion', methods=('GET', 'POST'))
 def nueva_asignacion():
-    # Intenta obtener la conexión a la DB. Si falla, el try/except externo la captura.
-    conn = None # Inicializa conn para el finally
-    rutas = [] # Inicializa rutas por si la conexión falla
+    conn = None 
+    rutas = [] 
     try: 
         conn = get_db_connection()
-        # Creamos un cursor para ejecutar la consulta, configurado para devolver diccionarios
-        cursor = conn.cursor() # Usamos el cursor_factory configurado en get_db_connection
+        # ¡CORRECCIÓN CLAVE! Crear un cursor
+        cursor = conn.cursor() 
+        
         orden_rutas = [
             'NUEVA ROSITA', 'CLOETE', 'AGUJITA', 'SABINAS', 'BARROTERAN',
             'ESPERANZAS', 'AURA', 'MUZQUIZ', 'PALAU', 'MANANTIALES'
@@ -134,12 +134,13 @@ def nueva_asignacion():
             order_case += f"WHEN '{ruta_name}' THEN {i} "
         order_case += "ELSE 99 END"
         rutas = cursor.execute(f'SELECT id_ruta, nombre, recorrido FROM Rutas ORDER BY {order_case}, nombre').fetchall()
+        
         conn.close() 
     except Exception as e:
         logger.error(f"Error al cargar formulario de nueva asignación (GET): {e}", exc_info=True)
         flash(f"Error al cargar rutas/horarios: {e}. ¿Base de datos inicializada?", 'error')
-        # rutas ya está inicializado a []
-    finally: # Asegura que la conexión se cierra si se abrió en el try
+        rutas = [] 
+    finally:
         if conn: conn.close()
 
     if request.method == 'POST':
@@ -153,10 +154,10 @@ def nueva_asignacion():
         if not hora_salida_24h or not fecha or not id_ruta:
             flash('Error: Hora, Fecha y Ruta son campos obligatorios y la hora debe ser válida (ej. 3:00 PM o 15:45).', 'error')
         else:
-            conn = None # Inicializa conn para el finally
+            conn = None 
             try: 
                 conn = get_db_connection()
-                cursor = conn.cursor() # Obtener cursor
+                cursor = conn.cursor() 
                 cursor.execute("SELECT id_horario FROM HorariosSalida WHERE hora_salida = %s", (hora_salida_24h,))
                 horario_db = cursor.fetchone()
 
@@ -164,16 +165,14 @@ def nueva_asignacion():
                 if horario_db:
                     id_horario = horario_db['id_horario']
                 else:
-                    # En PostgreSQL, usamos %s como placeholder
                     cursor.execute("INSERT INTO HorariosSalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
-                                (hora_salida_24h, "Todos", False)) # False para BOOLEAN
+                                (hora_salida_24h, "Todos", False)) 
                     conn.commit()
-                    id_horario = cursor.fetchone()['id_horario'] # Obtener el ID del nuevo horario con RETURNING
+                    id_horario = cursor.fetchone()[0] 
 
                 if id_horario:
-                    # En PostgreSQL, usamos %s como placeholder
                     cursor.execute('INSERT INTO Asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
-                                (id_horario, id_ruta, numero_camion_manual, fecha)) # Fecha debe ser 'YYYY-MM-DD'
+                                (id_horario, id_ruta, numero_camion_manual, fecha)) 
                     conn.commit()
                     flash('Asignación creada exitosamente.', 'success')
                     return redirect(url_for('admin_dashboard'))
@@ -189,12 +188,13 @@ def nueva_asignacion():
 
     return render_template('nueva_asignacion.html', rutas=rutas)
 
+
 @app.route('/eliminar_asignacion/<int:id_asignacion>', methods=('POST',))
 def eliminar_asignacion(id_asignacion):
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() # Obtener cursor
+        cursor = conn.cursor() 
         cursor.execute('DELETE FROM Asignaciones WHERE id_asignacion = %s', (id_asignacion,))
         conn.commit()
         flash('Asignación eliminada exitosamente.', 'success')
@@ -211,7 +211,7 @@ def limpiar_asignaciones():
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() # Obtener cursor
+        cursor = conn.cursor() 
         cursor.execute('DELETE FROM Asignaciones')
         conn.commit()
         flash('Todas las asignaciones han sido eliminadas.', 'success')
@@ -227,8 +227,8 @@ def limpiar_asignaciones():
 @app.route('/editar_asignacion/<int:id_asignacion>', methods=('GET', 'POST'))
 def editar_asignacion(id_asignacion):
     conn = None
-    asignacion = None # Inicializa asignacion
-    rutas = [] # Inicializa rutas
+    asignacion = None 
+    rutas = [] 
     try:
         conn = get_db_connection()
         cursor = conn.cursor() # Obtener cursor
