@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error en la Aplicación</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f8d7da; /* Fondo rojo claro */
+            color: #721c24; /* Texto rojo oscuro */
+            text-align: center;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 50px auto;
+            border: 1px solid #f5c6cb;
+        }
+        h1 {
+            color: #dc3545; /* Rojo fuerte */
+            margin-bottom: 20px;
+        }
+        pre {
+            background-color: #eee;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: left;
+            white-space: pre-wrap; /* Permite que el texto se envuelva */
+            word-wrap: break-word; /* Rompe palabras largas */
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+            margin-top: 20px;
+            display: inline-block;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>¡Lo sentimos, ha ocurrido un error!</h1>
+        {% if error_message %}
+            <p><strong>Mensaje de Error:</strong> {{ error_message }}</p>
+        {% endif %}
+        {% if error_details %}
+            <p><strong>Detalles:</strong></p>
+            <pre>{{ error_details }}</pre>
+        {% endif %}
+        <p>Por favor, intenta <a href="{{ url_for('admin_dashboard') }}">volver al panel de administración</a> o contacta al soporte.</p>
+    </div>
+</body>
+</html>
