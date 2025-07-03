@@ -152,13 +152,13 @@ def nueva_asignacion():
                     id_horario = horario_db[0] # Acceder por índice 0 si es una tupla
                 else:
                     cursor.execute("INSERT INTO HorariosSalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
-                                   (hora_salida_24h, "Todos", False)) 
+                                (hora_salida_24h, "Todos", False)) 
                     conn.commit()
                     id_horario = cursor.fetchone()[0] 
 
                 if id_horario:
                     cursor.execute('INSERT INTO Asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
-                                 (id_horario, id_ruta, numero_camion_manual, fecha)) 
+                                (id_horario, id_ruta, numero_camion_manual, fecha)) 
                     conn.commit()
                     flash('Asignación creada exitosamente.', 'success')
                     return redirect(url_for('admin_dashboard'))
@@ -273,7 +273,7 @@ def editar_asignacion(id_asignacion):
                     id_horario_nuevo = horario_db[0] # Acceder por índice
                 else:
                     cursor.execute("INSERT INTO HorariosSalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
-                                   (hora_salida_24h, "Todos", False)) 
+                                (hora_salida_24h, "Todos", False)) 
                     conn.commit()
                     id_horario_nuevo = cursor.fetchone()[0]
 
@@ -297,9 +297,9 @@ def editar_asignacion(id_asignacion):
                     conn.close()
     
     return render_template('editar_asignacion.html', 
-                           asignacion=asignacion, 
-                           rutas=rutas, 
-                           asignacion_hora_12h=asignacion['hora_salida_12h'])
+                        asignacion=asignacion, 
+                        rutas=rutas, 
+                        asignacion_hora_12h=asignacion['hora_salida_12h'])
 
 @app.route('/copiar_asignacion/<int:id_asignacion>', methods=('POST',))
 def copiar_asignacion(id_asignacion):
@@ -318,7 +318,7 @@ def copiar_asignacion(id_asignacion):
         conn_insert = get_db_connection() # Nueva conexión para la inserción
         cursor_insert = conn_insert.cursor() # Obtener cursor para inserción
         cursor_insert.execute('INSERT INTO Asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
-                     (asignacion_original['id_horario'], asignacion_original['id_ruta'], asignacion_original['numero_camion_manual'], asignacion_original['fecha']))
+                    (asignacion_original['id_horario'], asignacion_original['id_ruta'], asignacion_original['numero_camion_manual'], asignacion_original['fecha']))
         conn_insert.commit()
         flash('Asignación copiada exitosamente. Puedes editarla si necesitas cambiar la fecha/hora.', 'success')
     except Exception as e:
@@ -409,8 +409,8 @@ def pantalla_personal():
         salidas_ahora_agrupadas_por_ruta = defaultdict(lambda: defaultdict(list))
         if hora_activa_para_display_24h and fecha_activa_para_display:
             salidas_ahora_raw = [s for s in all_relevant_departures if 
-                             s['fecha'] == fecha_activa_para_display and 
-                             s['hora_salida'] == hora_activa_para_display_24h]
+                            s['fecha'] == fecha_activa_para_display and 
+                            s['hora_salida'] == hora_activa_para_display_24h]
             
             for salida in salidas_ahora_raw:
                 ruta_nombre = salida['nombre_ruta']
@@ -484,12 +484,12 @@ def pantalla_personal():
         display_fecha_actual = now.strftime('%d/%m/%Y')
 
         return render_template('pantalla_personal.html', 
-                               salidas_ahora_agrupadas_por_ruta=salidas_ahora_para_plantilla, 
-                               hora_activa_para_display_12h=convert_to_12h(hora_activa_para_display_24h) if hora_activa_para_display_24h else None, 
-                               fecha_activa_para_display=fecha_activa_para_display, 
-                               proximas_salidas_agrupadas_por_ruta=proximas_salidas_para_plantilla, 
-                               hora_actual=display_hora_actual, 
-                               fecha_actual=display_fecha_actual)
+                            salidas_ahora_agrupadas_por_ruta=salidas_ahora_para_plantilla, 
+                            hora_activa_para_display_12h=convert_to_12h(hora_activa_para_display_24h) if hora_activa_para_display_24h else None, 
+                            fecha_activa_para_display=fecha_activa_para_display, 
+                            proximas_salidas_agrupadas_por_ruta=proximas_salidas_para_plantilla, 
+                            hora_actual=display_hora_actual, 
+                            fecha_actual=display_fecha_actual)
     except Exception as e:
         # Se cierra la conexión a la DB en caso de error si llegó a abrirse
         if 'conn' in locals() and conn:
