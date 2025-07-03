@@ -1,4 +1,4 @@
-# app.py
+# app.py - VERSIÓN CORREGIDA
 
 from flask import Flask, render_template, request, redirect, url_for, flash
 import datetime
@@ -18,7 +18,6 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
-
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'una_clave_secreta_por_defecto_para_desarrollo')
@@ -50,7 +49,7 @@ def convert_to_12h(time_str_24h):
     except ValueError:
         return None
 
-# Función de ayuda para conectar a la base de datos (¡CORRECTA PARA POSTGRESQL!)
+# Función de ayuda para conectar a la base de datos
 def get_db_connection():
     if not DATABASE_URL:
         logger.error("ERROR CRÍTICO: La variable de entorno 'DATABASE_URL' no está configurada para la conexión a DB.")
@@ -58,9 +57,7 @@ def get_db_connection():
     
     try:
         conn = psycopg2.connect(DATABASE_URL)
-        # ¡CORRECCIÓN CRÍTICA! Establecer cursor_factory aquí para que todos los cursores por defecto sean RealDictCursor.
         conn.cursor_factory = psycopg2.extras.RealDictCursor 
-        # También establecer autocommit a False, para manejar transacciones manualmente con conn.commit()/rollback()
         conn.autocommit = False 
         
         logger.info("Conexión a la base de datos PostgreSQL exitosa.")
@@ -69,16 +66,15 @@ def get_db_connection():
         logger.error(f"ERROR: Falló la conexión a la base de datos PostgreSQL: {e}", exc_info=True)
         raise e 
 
-
 @app.route('/')
 def admin_dashboard():
     conn = None 
     try:
         conn = get_db_connection()
-        # ¡CORRECCIÓN CLAVE! Crear un cursor
         cursor = conn.cursor() 
 
-        asignaciones_raw = cursor.execute('''
+        # ✅ CORRECCIÓN: Separar execute() y fetchall()
+        cursor.execute('''
             SELECT
                 A.id_asignacion,
                 HS.hora_salida, 
@@ -94,13 +90,14 @@ def admin_dashboard():
             JOIN rutas AS R ON A.id_ruta = R.id_ruta
             WHERE A.fecha >= %s 
             ORDER BY A.fecha, HS.hora_salida
-        ''', (datetime.date.today().strftime('%Y-%m-%d'),)).fetchall()
+        ''', (datetime.date.today().strftime('%Y-%m-%d'),))
         
+        asignaciones_raw = cursor.fetchall()
         conn.close() 
 
         asignaciones = []
         for asignacion_row in asignaciones_raw:
-            asignacion_dict = asignacion_row 
+            asignacion_dict = dict(asignacion_row)
             asignacion_dict['hora_salida_12h'] = convert_to_12h(asignacion_dict['hora_salida'])
             asignaciones.append(asignacion_dict)
         
@@ -108,9 +105,8 @@ def admin_dashboard():
     except Exception as e:
         logger.error(f"Error al cargar admin_dashboard: {e}", exc_info=True)
         flash(f"Error al cargar el panel de administración: {e}. ¿Base de datos inicializada?", 'error')
-        if 'conn' in locals() and conn: conn.close()
+        if conn: conn.close()
         return render_template('admin_dashboard.html', asignaciones=[]) 
-
 
 @app.route('/nueva_asignacion', methods=('GET', 'POST'))
 def nueva_asignacion():
@@ -129,7 +125,10 @@ def nueva_asignacion():
             order_case += f"WHEN '{ruta_name}' THEN {i} "
         order_case += "ELSE 99 END"
         query_rutas_ordered = f'SELECT id_ruta, nombre, recorrido FROM rutas ORDER BY {order_case}, nombre'
-        rutas = cursor.execute(query_rutas_ordered).fetchall()
+        
+        # ✅ CORRECCIÓN: Separar execute() y fetchall()
+        cursor.execute(query_rutas_ordered)
+        rutas = cursor.fetchall()
         
     except Exception as e:
         logger.error(f"Error al cargar formulario de nueva asignación (GET): {e}", exc_info=True)
@@ -163,12 +162,12 @@ def nueva_asignacion():
 
                 id_horario = None
                 if horario_db:
-                    id_horario = horario_db[0] 
+                    id_horario = horario_db['id_horario'] 
                 else:
                     cursor.execute("INSERT INTO horariossalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
                                    (hora_salida_24h, "Todos", False)) 
                     conn.commit()
-                    id_horario = cursor.fetchone()[0] 
+                    id_horario = cursor.fetchone()['id_horario']
 
                 if id_horario:
                     cursor.execute('INSERT INTO asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
@@ -180,15 +179,13 @@ def nueva_asignacion():
                     flash('Error: No se pudo determinar/crear el ID de horario.', 'error')
 
             except Exception as e: 
-                conn.rollback() 
+                if conn: conn.rollback() 
                 logger.error(f"Error al guardar nueva asignación (POST): {e}", exc_info=True)
                 flash(f'Error al guardar asignación: {e}. ¿Base de datos inicializada o datos inválidos?', 'error')
             finally:
-                if conn: 
-                    conn.close()
+                if conn: conn.close()
 
     return render_template('nueva_asignacion.html', rutas=rutas)
-
 
 @app.route('/eliminar_asignacion/<int:id_asignacion>', methods=('POST',))
 def eliminar_asignacion(id_asignacion):
@@ -200,12 +197,11 @@ def eliminar_asignacion(id_asignacion):
         conn.commit()
         flash('Asignación eliminada exitosamente.', 'success')
     except Exception as e:
-        conn.rollback()
+        if conn: conn.rollback()
         logger.error(f"Error al eliminar asignación: {e}", exc_info=True)
         flash(f'Error al eliminar asignación: {e}', 'error')
     finally:
-        if conn:
-            conn.close()
+        if conn: conn.close()
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/limpiar_asignaciones', methods=('POST',))
@@ -218,21 +214,18 @@ def limpiar_asignaciones():
         conn.commit()
         flash('Todas las asignaciones han sido eliminadas.', 'success')
     except Exception as e:
-        conn.rollback()
+        if conn: conn.rollback()
         logger.error(f"Error al limpiar asignaciones: {e}", exc_info=True)
         flash(f'Error al limpiar asignaciones: {e}', 'error')
     finally:
-        if conn:
-            conn.close()
+        if conn: conn.close()
     return redirect(url_for('admin_dashboard'))
-
 
 @app.route('/editar_asignacion/<int:id_asignacion>', methods=('GET', 'POST'))
 def editar_asignacion(id_asignacion):
     conn = None
     asignacion = None 
     rutas = [] 
-    # Inicializa las variables para asegurar que siempre estén definidas en el POST si el GET falla
     hora_salida_12h_input = None 
     fecha = None
     id_ruta_val = None 
@@ -241,7 +234,10 @@ def editar_asignacion(id_asignacion):
     try:
         conn = get_db_connection()
         cursor = conn.cursor() 
-        asignacion_base = cursor.execute('SELECT A.*, HS.hora_salida FROM asignaciones AS A JOIN horariossalida AS HS ON A.id_horario = HS.id_horario WHERE A.id_asignacion = %s', (id_asignacion,)).fetchone()
+        
+        # ✅ CORRECCIÓN: Separar execute() y fetchone()
+        cursor.execute('SELECT A.*, HS.hora_salida FROM asignaciones AS A JOIN horariossalida AS HS ON A.id_horario = HS.id_horario WHERE A.id_asignacion = %s', (id_asignacion,))
+        asignacion_base = cursor.fetchone()
         
         if asignacion_base is None:
             flash('Asignación no encontrada.', 'error')
@@ -260,7 +256,10 @@ def editar_asignacion(id_asignacion):
             order_case += f"WHEN '{ruta_name}' THEN {i} "
         order_case += "ELSE 99 END"
         query_rutas_ordered = f'SELECT id_ruta, nombre, recorrido FROM rutas ORDER BY {order_case}, nombre'
-        rutas = cursor.execute(query_rutas_ordered).fetchall()
+        
+        # ✅ CORRECCIÓN: Separar execute() y fetchall()
+        cursor.execute(query_rutas_ordered)
+        rutas = cursor.fetchall()
         
     except Exception as e:
         logger.error(f"Error al cargar asignación para editar (GET): {e}", exc_info=True)
@@ -290,12 +289,12 @@ def editar_asignacion(id_asignacion):
 
                 id_horario_nuevo = None
                 if horario_db:
-                    id_horario_nuevo = horario_db[0] 
+                    id_horario_nuevo = horario_db['id_horario']
                 else:
                     cursor.execute("INSERT INTO horariossalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
                                    (hora_salida_24h, "Todos", False)) 
                     conn.commit()
-                    id_horario_nuevo = cursor.fetchone()[0]
+                    id_horario_nuevo = cursor.fetchone()['id_horario']
 
                 if id_horario_nuevo:
                     cursor.execute('''
@@ -310,60 +309,60 @@ def editar_asignacion(id_asignacion):
                     flash('Error: No se pudo determinar/crear el ID de horario para la actualización.', 'error')
 
             except Exception as e:
-                conn.rollback()
+                if conn: conn.rollback()
                 logger.error(f"Error al actualizar asignación (POST): {e}", exc_info=True)
                 flash(f'Error al actualizar asignación: {e}', 'error')
             finally:
-                if conn:
-                    conn.close()
+                if conn: conn.close()
     
     return render_template('editar_asignacion.html', 
                            asignacion=asignacion, 
                            rutas=rutas, 
-                           asignacion_hora_12h=asignacion['hora_salida_12h'])
+                           asignacion_hora_12h=asignacion['hora_salida_12h'] if asignacion else None)
 
 @app.route('/copiar_asignacion/<int:id_asignacion>', methods=('POST',))
 def copiar_asignacion(id_asignacion):
     conn = None 
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() # Cursor estándar para fetch inicial
-        asignacion_original = cursor.execute('SELECT * FROM asignaciones WHERE id_asignacion = %s', (id_asignacion,)).fetchone()
+        cursor = conn.cursor()
+        
+        # ✅ CORRECCIÓN: Separar execute() y fetchone()
+        cursor.execute('SELECT * FROM asignaciones WHERE id_asignacion = %s', (id_asignacion,))
+        asignacion_original = cursor.fetchone()
         
         if asignacion_original is None:
             flash('Asignación original no encontrada para copiar.', 'error')
             if conn: conn.close() 
             return redirect(url_for('admin_dashboard'))
 
-        cursor_insert = conn.cursor() # Usar otro cursor para la inserción
-        cursor_insert.execute('INSERT INTO asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
-                     (asignacion_original['id_horario'], asignacion_original['id_ruta'], asignacion_original['numero_camion_manual'], asignacion_original['fecha']))
+        cursor.execute('INSERT INTO asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
+                     (asignacion_original['id_horario'], asignacion_original['id_ruta'], 
+                      asignacion_original['numero_camion_manual'], asignacion_original['fecha']))
         conn.commit()
         flash('Asignación copiada exitosamente. Puedes editarla si necesitas cambiar la fecha/hora.', 'success')
     except Exception as e:
-        conn.rollback()
+        if conn: conn.rollback()
         logger.error(f"Error al copiar asignación: {e}", exc_info=True)
         flash(f'Error al copiar asignación: {e}', 'error')
     finally:
-        if conn: # Cierra la conexión principal
-            conn.close()
+        if conn: conn.close()
     return redirect(url_for('admin_dashboard'))
-
 
 @app.route('/pantalla')
 def pantalla_personal():
     conn = None
     try: 
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) # Obtener cursor con RealDictCursor
+        cursor = conn.cursor()
         
         utc_now = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
         now = utc_now.astimezone(MONTERREY_TZ)
         
         hoy_str = now.strftime('%Y-%m-%d')
-        hora_actual_dt = now.time()
         
-        all_relevant_departures_raw = cursor.execute('''
+        # ✅ CORRECCIÓN: Separar execute() y fetchall()
+        cursor.execute('''
             SELECT
                 HS.hora_salida,
                 HS.dias_semana,
@@ -377,11 +376,13 @@ def pantalla_personal():
             JOIN rutas AS R ON A.id_ruta = R.id_ruta
             WHERE A.fecha >= %s
             ORDER BY A.fecha ASC, HS.hora_salida ASC
-        ''', (hoy_str,)).fetchall()
+        ''', (hoy_str,))
+        
+        all_relevant_departures_raw = cursor.fetchall()
 
         all_relevant_departures = []
         for row in all_relevant_departures_raw:
-            all_relevant_departures.append(row) 
+            all_relevant_departures.append(dict(row))
 
         salidas_ahora_raw = []
         hora_activa_para_display_24h = None 
@@ -460,7 +461,6 @@ def pantalla_personal():
                 'grupos_por_fecha_hora': grupos_por_fecha_hora_ordenados 
             })
 
-
         proximas_salidas_raw = []
         
         if hora_activa_para_display_24h and fecha_activa_para_display:
@@ -511,13 +511,10 @@ def pantalla_personal():
                                hora_actual=display_hora_actual, 
                                fecha_actual=display_fecha_actual)
     except Exception as e:
-        # Se cierra la conexión a la DB en caso de error si llegó a abrirse
-        if 'conn' in locals() and conn:
-            conn.close()
+        if conn: conn.close()
         logger.error(f"Error al cargar pantalla_personal: {e}", exc_info=True)
         flash(f"Error crítico al cargar la pantalla de personal: {e}. ¿Base de datos inicializada?", 'error')
-        return render_template('error_page.html', error_message=str(e)) # Crear error_page.html
-
+        return render_template('error_page.html', error_message=str(e))
 
 if __name__ == '__main__':
     app.run()
