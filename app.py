@@ -1,4 +1,4 @@
-# app.py (CÓDIGO COMPLETO Y FINAL - ¡AHORA SÍ, LA CORRECCIÓN DEFINITIVA!)
+# app.py
 
 from flask import Flask, render_template, request, redirect, url_for, flash
 import datetime
@@ -50,7 +50,7 @@ def convert_to_12h(time_str_24h):
     except ValueError:
         return None
 
-# Función de ayuda para conectar a la base de datos (¡FINALMENTE CORREGIDA A LO QUE DEBE SER!)
+# Función de ayuda para conectar a la base de datos
 def get_db_connection():
     if not DATABASE_URL:
         logger.error("ERROR CRÍTICO: La variable de entorno 'DATABASE_URL' no está configurada para la conexión a DB.")
@@ -58,9 +58,7 @@ def get_db_connection():
     
     try:
         conn = psycopg2.connect(DATABASE_URL)
-        # ¡ESTA ES LA LÍNEA QUE DEBE ESTAR Y NO ESTABA EN TU ÚLTIMA VERSIÓN!
-        # Configura la fábrica de cursores por defecto para la conexión
-        conn.cursor_factory = psycopg2.extras.RealDictCursor 
+        conn.cursor_factory = psycopg2.extras.RealDictCursor # ¡ESTA LÍNEA ES CRÍTICA Y DEBE ESTAR AQUÍ!
         conn.autocommit = False 
         
         logger.info("Conexión a la base de datos PostgreSQL exitosa.")
@@ -73,12 +71,13 @@ def get_db_connection():
 @app.route('/')
 def admin_dashboard():
     conn = None 
+    cursor = None # Inicializar cursor
     try:
         conn = get_db_connection()
-        # Ahora, cursor = conn.cursor() YA DEVOLVERÁ RealDictCursor gracias a get_db_connection()
         cursor = conn.cursor() 
 
-        asignaciones_raw = cursor.execute('''
+        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchall()
+        cursor.execute('''
             SELECT
                 A.id_asignacion,
                 HS.hora_salida, 
@@ -94,8 +93,9 @@ def admin_dashboard():
             JOIN rutas AS R ON A.id_ruta = R.id_ruta
             WHERE A.fecha >= %s 
             ORDER BY A.fecha, HS.hora_salida
-        ''', (datetime.date.today().strftime('%Y-%m-%d'),)).fetchall()
-        
+        ''', (datetime.date.today().strftime('%Y-%m-%d'),))
+        asignaciones_raw = cursor.fetchall() # <-- Llamada separada
+
         conn.close() 
 
         asignaciones = []
@@ -109,7 +109,7 @@ def admin_dashboard():
         logger.error(f"Error al cargar admin_dashboard: {e}", exc_info=True)
         flash(f"Error al cargar el panel de administración: {e}. ¿Base de datos inicializada?", 'error')
         if 'conn' in locals() and conn: conn.close()
-        return render_template('error_page.html', error_message=str(e)) 
+        return render_template('error_page.html', error_message=str(e), error_details=str(e)) 
 
 
 @app.route('/nueva_asignacion', methods=('GET', 'POST'))
@@ -118,7 +118,7 @@ def nueva_asignacion():
     rutas = [] 
     try: 
         conn = get_db_connection()
-        cursor = conn.cursor() # Ya devolverá RealDictCursor
+        cursor = conn.cursor() 
         
         orden_rutas = [
             'NUEVA ROSITA', 'CLOETE', 'AGUJITA', 'SABINAS', 'BARROTERAN',
@@ -129,7 +129,10 @@ def nueva_asignacion():
             order_case += f"WHEN '{ruta_name}' THEN {i} "
         order_case += "ELSE 99 END"
         query_rutas_ordered = f'SELECT id_ruta, nombre, recorrido FROM rutas ORDER BY {order_case}, nombre'
-        rutas = cursor.execute(query_rutas_ordered).fetchall()
+        
+        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchall()
+        cursor.execute(query_rutas_ordered)
+        rutas = cursor.fetchall() # <-- Llamada separada
         
     except Exception as e:
         logger.error(f"Error al cargar formulario de nueva asignación (GET): {e}", exc_info=True)
@@ -158,22 +161,20 @@ def nueva_asignacion():
             cursor = None
             try: 
                 conn = get_db_connection()
-                # ¡CORRECCIÓN! Usar un cursor NORMAL (sin RealDictCursor) para INSERT/UPDATE/DELETE.
-                # Es mejor tener un cursor separado para SELECTs vs INSERTs/UPDATEs/DELETEs si se mezclan en la misma función,
-                # o si necesitas que fetchone devuelva tuplas para operaciones de escritura.
-                # Aquí, como get_db_connection() ya establece RealDictCursor, simplemente lo obtenemos normal.
                 cursor = conn.cursor() 
+
+                # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchone()
                 cursor.execute("SELECT id_horario FROM horariossalida WHERE hora_salida = %s", (hora_salida_24h,))
-                horario_db = cursor.fetchone() 
+                horario_db = cursor.fetchone() # <-- Llamada separada
 
                 id_horario = None
                 if horario_db:
-                    id_horario = horario_db[0] 
+                    id_horario = horario_db['id_horario'] # Ahora es un diccionario
                 else:
                     cursor.execute("INSERT INTO horariossalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
                                    (hora_salida_24h, "Todos", False)) 
                     conn.commit()
-                    id_horario = cursor.fetchone()[0] 
+                    id_horario = cursor.fetchone()['id_horario'] # <-- Llamada separada (obtener de diccionario)
 
                 if id_horario:
                     cursor.execute('INSERT INTO asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
@@ -185,7 +186,7 @@ def nueva_asignacion():
                     flash('Error: No se pudo determinar/crear el ID de horario.', 'error')
 
             except Exception as e: 
-                conn.rollback() 
+                if conn: conn.rollback() 
                 logger.error(f"Error al guardar nueva asignación (POST): {e}", exc_info=True)
                 flash(f'Error al guardar asignación: {e}. ¿Base de datos inicializada o datos inválidos?', 'error')
             finally:
@@ -206,7 +207,7 @@ def eliminar_asignacion(id_asignacion):
         conn.commit()
         flash('Asignación eliminada exitosamente.', 'success')
     except Exception as e:
-        conn.rollback()
+        if conn: conn.rollback()
         logger.error(f"Error al eliminar asignación: {e}", exc_info=True)
         flash(f'Error al eliminar asignación: {e}', 'error')
     finally:
@@ -225,12 +226,12 @@ def limpiar_asignaciones():
         conn.commit()
         flash('Todas las asignaciones han sido eliminadas.', 'success')
     except Exception as e:
-        conn.rollback()
+        if conn: conn.rollback()
         logger.error(f"Error al limpiar asignaciones: {e}", exc_info=True)
         flash(f'Error al limpiar asignaciones: {e}', 'error')
     finally:
-        if conn:
-            conn.close()
+        if cursor: cursor.close()
+        if conn: conn.close()
     return redirect(url_for('admin_dashboard'))
 
 
@@ -239,7 +240,6 @@ def editar_asignacion(id_asignacion):
     conn = None
     asignacion = None 
     rutas = [] 
-    # Inicializa las variables para asegurar que siempre estén definidas en el POST si el GET falla
     hora_salida_12h_input = None 
     fecha = None
     id_ruta_val = None 
@@ -247,8 +247,10 @@ def editar_asignacion(id_asignacion):
 
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() # Usar el cursor por defecto (RealDictCursor) para la consulta de asignacion_base
-        asignacion_base = cursor.execute('SELECT A.*, HS.hora_salida FROM asignaciones AS A JOIN horariossalida AS HS ON A.id_horario = HS.id_horario WHERE A.id_asignacion = %s', (id_asignacion,)).fetchone()
+        cursor = conn.cursor() 
+        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchone()
+        cursor.execute('SELECT A.*, HS.hora_salida FROM asignaciones AS A JOIN horariossalida AS HS ON A.id_horario = HS.id_horario WHERE A.id_asignacion = %s', (id_asignacion,))
+        asignacion_base = cursor.fetchone() # <-- Llamada separada
         
         if asignacion_base is None:
             flash('Asignación no encontrada.', 'error')
@@ -267,7 +269,10 @@ def editar_asignacion(id_asignacion):
             order_case += f"WHEN '{ruta_name}' THEN {i} "
         order_case += "ELSE 99 END"
         query_rutas_ordered = f'SELECT id_ruta, nombre, recorrido FROM rutas ORDER BY {order_case}, nombre'
-        rutas = cursor.execute(query_rutas_ordered).fetchall()
+        
+        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchall()
+        cursor.execute(query_rutas_ordered)
+        rutas = cursor.fetchall() # <-- Llamada separada
         
     except Exception as e:
         logger.error(f"Error al cargar asignación para editar (GET): {e}", exc_info=True)
@@ -292,18 +297,20 @@ def editar_asignacion(id_asignacion):
             cursor = None
             try:
                 conn = get_db_connection()
-                cursor = conn.cursor() # Obtener cursor para POST (escritura)
+                cursor = conn.cursor() 
+                
+                # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchone()
                 cursor.execute("SELECT id_horario FROM horariossalida WHERE hora_salida = %s", (hora_salida_24h,))
-                horario_db = cursor.fetchone()
+                horario_db = cursor.fetchone() # <-- Llamada separada
 
                 id_horario_nuevo = None
                 if horario_db:
-                    id_horario_nuevo = horario_db[0] 
+                    id_horario_nuevo = horario_db['id_horario'] # Ahora es un diccionario
                 else:
                     cursor.execute("INSERT INTO horariossalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
                                    (hora_salida_24h, "Todos", False)) 
                     conn.commit()
-                    id_horario_nuevo = cursor.fetchone()[0]
+                    id_horario_nuevo = cursor.fetchone()['id_horario'] # <-- Llamada separada (obtener de diccionario)
 
                 if id_horario_nuevo:
                     cursor.execute('''
@@ -315,7 +322,7 @@ def editar_asignacion(id_asignacion):
                     flash('Asignación actualizada exitosamente.', 'success')
                     return redirect(url_for('admin_dashboard'))
                 else:
-                    flash('Error: No se pudo determinar/crear el ID de horario para la actualización.', 'error')
+                    flash('Error: No se pudo determinar/crear el ID de horario.', 'error')
 
             except Exception as e:
                 conn.rollback()
@@ -335,16 +342,16 @@ def copiar_asignacion(id_asignacion):
     conn = None 
     try:
         conn = get_db_connection()
-        # Cursor para SELECT (RealDictCursor)
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
-        asignacion_original = cursor.execute('SELECT * FROM asignaciones WHERE id_asignacion = %s', (id_asignacion,)).fetchone()
+        cursor = conn.cursor() # Cursor para SELECT
+        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchone()
+        cursor.execute('SELECT * FROM asignaciones WHERE id_asignacion = %s', (id_asignacion,))
+        asignacion_original = cursor.fetchone() # <-- Llamada separada
         
         if asignacion_original is None:
             flash('Asignación original no encontrada para copiar.', 'error')
             if conn: conn.close() 
             return redirect(url_for('admin_dashboard'))
 
-        # Usar un cursor NORMAL para la inserción
         cursor_insert = conn.cursor() 
         cursor_insert.execute('INSERT INTO asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
                      (asignacion_original['id_horario'], asignacion_original['id_ruta'], asignacion_original['numero_camion_manual'], asignacion_original['fecha']))
@@ -355,9 +362,8 @@ def copiar_asignacion(id_asignacion):
         logger.error(f"Error al copiar asignación: {e}", exc_info=True)
         flash(f'Error al copiar asignación: {e}', 'error')
     finally:
-        # Aquí se necesita cerrar ambos cursores si existen, y luego la conexión
-        if 'cursor' in locals() and cursor: cursor.close()
-        if 'cursor_insert' in locals() and cursor_insert: cursor_insert.close()
+        if 'cursor' in locals() and cursor: cursor.close() # Cierra el primer cursor
+        if 'cursor_insert' in locals() and cursor_insert: cursor_insert.close() # Cierra el segundo cursor si existió
         if conn: 
             conn.close()
     return redirect(url_for('admin_dashboard'))
@@ -368,7 +374,7 @@ def pantalla_personal():
     conn = None
     try: 
         conn = get_db_connection()
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) # Obtener cursor con RealDictCursor
+        cursor = conn.cursor() 
         
         utc_now = datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
         now = utc_now.astimezone(MONTERREY_TZ)
@@ -376,7 +382,8 @@ def pantalla_personal():
         hoy_str = now.strftime('%Y-%m-%d')
         hora_actual_dt = now.time()
         
-        all_relevant_departures_raw = cursor.execute('''
+        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchall()
+        cursor.execute('''
             SELECT
                 HS.hora_salida,
                 HS.dias_semana,
@@ -390,7 +397,8 @@ def pantalla_personal():
             JOIN rutas AS R ON A.id_ruta = R.id_ruta
             WHERE A.fecha >= %s
             ORDER BY A.fecha ASC, HS.hora_salida ASC
-        ''', (hoy_str,)).fetchall()
+        ''', (hoy_str,))
+        all_relevant_departures_raw = cursor.fetchall() # <-- Llamada separada
 
         all_relevant_departures = []
         for row in all_relevant_departures_raw:
@@ -529,7 +537,7 @@ def pantalla_personal():
             conn.close()
         logger.error(f"Error al cargar pantalla_personal: {e}", exc_info=True)
         flash(f"Error crítico al cargar la pantalla de personal: {e}. ¿Base de datos inicializada?", 'error')
-        return render_template('error_page.html', error_message=str(e)) # Crear error_page.html
+        return render_template('error_page.html', error_message=str(e)) 
 
 
 if __name__ == '__main__':
