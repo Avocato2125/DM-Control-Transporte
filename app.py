@@ -1,13 +1,15 @@
 # app.py
 
 from flask import Flask, render_template, request, redirect, url_for, flash
+# Ya no usamos sqlite3. Puedes eliminar esta línea.
+# import sqlite3 
 import datetime
 from collections import defaultdict
 import os
-import pytz # Importar pytz para zonas horarias
-import psycopg2 # NECESARIO para conectar a PostgreSQL
-import psycopg2.extras # NECESARIO para obtener filas como diccionarios en psycopg2
-import logging # NECESARIO para logging más robusto
+import pytz 
+import psycopg2 
+import psycopg2.extras 
+import logging 
 
 # Configurar logging básico para ver errores en la consola/logs de Railway
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -15,37 +17,28 @@ logger = logging.getLogger(__name__)
 
 
 app = Flask(__name__)
-# Obtener la clave secreta de una variable de entorno para producción, o usar una por defecto para desarrollo
 app.secret_key = os.environ.get('SECRET_KEY', 'una_clave_secreta_por_defecto_para_desarrollo')
 
-# Definir la zona horaria de Monterrey (Central Time)
-# Asegúrate de que esta zona horaria sea compatible con pytz
 MONTERREY_TZ = pytz.timezone('America/Monterrey')
 
 # Variable de entorno que Railway inyectará para la DB
-# Asegúrate de que 'DATABASE_URL' es el nombre EXACTO que Railway le dio.
-# Si Railway usó otro nombre (ej. 'PG_DATABASE_URL'), úsalo aquí.
 DATABASE_URL = os.environ.get('DATABASE_URL') 
 
 # --- Funciones de Conversión de Hora ---
 def convert_to_24h(time_str_12h):
-    """Convierte una cadena de hora de 12 horas (ej. '3:45 PM') a 24 horas (ej. '15:45')."""
     if not time_str_12h:
         return None
     try:
-        # Primero, intentar parsear con formato 12 horas (incluyendo AM/PM)
         dt_obj = datetime.datetime.strptime(time_str_12h.strip().upper(), '%I:%M %p')
         return dt_obj.strftime('%H:%M')
     except ValueError:
-        # Si falla (no tiene AM/PM), intentar como 24h directamente
         try:
             dt_obj = datetime.datetime.strptime(time_str_12h.strip(), '%H:%M')
             return dt_obj.strftime('%H:%M')
         except ValueError:
-            return None # Si ninguno funciona, es un formato inválido
+            return None 
 
 def convert_to_12h(time_str_24h):
-    """Convierte una cadena de hora de 24 horas (ej. '15:45') a 12 horas (ej. '03:45 PM')."""
     if not time_str_24h:
         return None
     try:
@@ -54,19 +47,15 @@ def convert_to_12h(time_str_24h):
     except ValueError:
         return None
 
-# Función de ayuda para conectar a la base de datos (¡CONEXIÓN A POSTGRESQL!)
+# Función de ayuda para conectar a la base de datos (¡CORRECTA PARA POSTGRESQL!)
 def get_db_connection():
-    # Verificamos si DATABASE_URL está configurada
     if not DATABASE_URL:
         logger.error("ERROR CRÍTICO: La variable de entorno 'DATABASE_URL' no está configurada para la conexión a DB.")
         raise ValueError("DATABASE_URL no configurada para la base de datos PostgreSQL.")
     
     try:
-        # Conexión a PostgreSQL usando la URL de la variable de entorno
         conn = psycopg2.connect(DATABASE_URL)
-        # Aquí NO configuramos conn.cursor_factory = RealDictCursor porque no se aplica a la conexión directa
-        # sino al cursor. Así que la línea que estaba mal en el código anterior era esa.
-        
+        # NOTA: La configuración de RealDictCursor se hace en CADA cursor, no aquí en la conexión.
         logger.info("Conexión a la base de datos PostgreSQL exitosa.")
         return conn
     except Exception as e:
@@ -76,16 +65,16 @@ def get_db_connection():
 
 @app.route('/')
 def admin_dashboard():
-    conn = None # Inicializa conn para el finally
+    conn = None 
     try:
         conn = get_db_connection()
-        # ¡CORRECCIÓN CLAVE! Crear un cursor y ejecutar en él.
+        # ¡CORRECCIÓN AQUÍ! Obtener un cursor con RealDictCursor para los SELECT
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
 
         asignaciones_raw = cursor.execute('''
             SELECT
                 A.id_asignacion,
-                HS.hora_salida, -- Obtenemos la hora_salida directamente de HorariosSalida
+                HS.hora_salida, 
                 HS.dias_semana,
                 R.nombre AS nombre_ruta,
                 R.recorrido,
@@ -96,7 +85,7 @@ def admin_dashboard():
             FROM Asignaciones AS A
             JOIN HorariosSalida AS HS ON A.id_horario = HS.id_horario
             JOIN Rutas AS R ON A.id_ruta = R.id_ruta
-            WHERE A.fecha >= %s -- Usar %s para placeholders en psycopg2
+            WHERE A.fecha >= %s 
             ORDER BY A.fecha, HS.hora_salida
         ''', (datetime.date.today().strftime('%Y-%m-%d'),)).fetchall()
         
@@ -104,8 +93,7 @@ def admin_dashboard():
 
         asignaciones = []
         for asignacion_row in asignaciones_raw:
-            # asignacion_row ya es un diccionario gracias a RealDictCursor
-            asignacion_dict = asignacion_row 
+            asignacion_dict = asignacion_row # Ya es un diccionario gracias a RealDictCursor
             asignacion_dict['hora_salida_12h'] = convert_to_12h(asignacion_dict['hora_salida'])
             asignaciones.append(asignacion_dict)
         
@@ -122,8 +110,8 @@ def nueva_asignacion():
     rutas = [] 
     try: 
         conn = get_db_connection()
-        # ¡CORRECCIÓN CLAVE! Crear un cursor
-        cursor = conn.cursor() 
+        # ¡CORRECCIÓN AQUÍ! Obtener un cursor con RealDictCursor para los SELECT
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
         
         orden_rutas = [
             'NUEVA ROSITA', 'CLOETE', 'AGUJITA', 'SABINAS', 'BARROTERAN',
@@ -157,13 +145,14 @@ def nueva_asignacion():
             conn = None 
             try: 
                 conn = get_db_connection()
+                # ¡CORRECCIÓN AQUÍ! Obtener un cursor (no necesitamos RealDictCursor para operaciones de escritura/retorno de ID)
                 cursor = conn.cursor() 
                 cursor.execute("SELECT id_horario FROM HorariosSalida WHERE hora_salida = %s", (hora_salida_24h,))
-                horario_db = cursor.fetchone()
+                horario_db = cursor.fetchone() 
 
                 id_horario = None
                 if horario_db:
-                    id_horario = horario_db['id_horario']
+                    id_horario = horario_db[0] # Acceder por índice 0 si es una tupla
                 else:
                     cursor.execute("INSERT INTO HorariosSalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
                                 (hora_salida_24h, "Todos", False)) 
@@ -194,7 +183,7 @@ def eliminar_asignacion(id_asignacion):
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() 
+        cursor = conn.cursor() # Obtener un cursor
         cursor.execute('DELETE FROM Asignaciones WHERE id_asignacion = %s', (id_asignacion,))
         conn.commit()
         flash('Asignación eliminada exitosamente.', 'success')
@@ -211,7 +200,7 @@ def limpiar_asignaciones():
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() 
+        cursor = conn.cursor() # Obtener un cursor
         cursor.execute('DELETE FROM Asignaciones')
         conn.commit()
         flash('Todas las asignaciones han sido eliminadas.', 'success')
@@ -231,7 +220,8 @@ def editar_asignacion(id_asignacion):
     rutas = [] 
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() # Obtener cursor
+        # ¡CORRECCIÓN AQUÍ! Obtener un cursor con RealDictCursor para SELECT
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
         asignacion_base = cursor.execute('SELECT A.*, HS.hora_salida FROM Asignaciones A JOIN HorariosSalida HS ON A.id_horario = HS.id_horario WHERE A.id_asignacion = %s', (id_asignacion,)).fetchone()
         
         if asignacion_base is None:
@@ -272,13 +262,13 @@ def editar_asignacion(id_asignacion):
             conn = None 
             try:
                 conn = get_db_connection()
-                cursor = conn.cursor() # Obtener cursor
+                cursor = conn.cursor() # Obtener cursor para POST (escritura)
                 cursor.execute("SELECT id_horario FROM HorariosSalida WHERE hora_salida = %s", (hora_salida_24h,))
                 horario_db = cursor.fetchone()
 
                 id_horario_nuevo = None
                 if horario_db:
-                    id_horario_nuevo = horario_db['id_horario']
+                    id_horario_nuevo = horario_db[0] # Acceder por índice
                 else:
                     cursor.execute("INSERT INTO HorariosSalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
                                 (hora_salida_24h, "Todos", False)) 
@@ -369,7 +359,7 @@ def pantalla_personal():
 
         all_relevant_departures = []
         for row in all_relevant_departures_raw:
-            all_relevant_departures.append(dict(row)) 
+            all_relevant_departures.append(row) 
 
         salidas_ahora_raw = []
         hora_activa_para_display_24h = None 
