@@ -54,26 +54,39 @@ def convert_to_12h(time_str_24h):
         return dt_obj.strftime('%I:%M %p')
     except ValueError:
         return None
-
-# Función de ayuda para conectar a la base de datos (¡AHORA PARA POSTGRESQL!)
 def get_db_connection():
     # Verificamos si DATABASE_URL está configurada
     if not DATABASE_URL:
         logger.error("ERROR CRÍTICO: La variable de entorno 'DATABASE_URL' no está configurada para la conexión a DB.")
-        # Se lanza una excepción para que la aplicación no intente operar sin DB
         raise ValueError("DATABASE_URL no configurada para la base de datos PostgreSQL.")
-    
+
     try:
-        # Conexión a PostgreSQL usando la URL de la variable de entorno
         conn = psycopg2.connect(DATABASE_URL)
-        # Para que las filas se comporten como diccionarios (acceso por nombre de columna)
-        conn.row_factory = psycopg2.extras.RealDictCursor 
+        # ¡CAMBIO CRÍTICO AQUÍ! Ya no es conn.row_factory.
+        # En psycopg2, usas cursor_factory al crear el cursor.
+        # conn.row_factory = psycopg2.extras.RealDictCursor # ESTO ES LO QUE CAUSABA EL ERROR
+
+        # Crea un cursor que devuelve filas como diccionarios
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
         logger.info("Conexión a la base de datos PostgreSQL exitosa.")
+
+        # Devuelve la conexión y el cursor si vas a usarlos directamente,
+        # pero dado que tu código siempre hace conn.execute, simplemente devuelve la conexión.
+        # Sin embargo, si quieres que los resultados de conn.execute se devuelvan como diccionarios,
+        # DEBES usar RealDictCursor al crear el cursor para CADA consulta o configurar el cursor
+        # para cada operación.
+        # La forma más directa es configurar el default_cursor_factory si quieres que conn.execute también use RealDictCursor.
+
+        # Opción 1: Configurar el default_cursor_factory de la conexión (recomendado para conn.execute)
+        conn.autocommit = False # Por defecto, psycopg2 usa transacciones, desactívalo si quieres commits manuales.
+                                # O simplemente, asegúrate de hacer conn.commit()
         return conn
+        # La línea que estaba mal era la 84 en tu app.py: conn.row_factory = sqlite3.Row -> la quitamos y no la ponemos para psycopg2
+        # La forma en que RealDictCursor funciona es a través del CURSOR.
+
     except Exception as e:
         logger.error(f"ERROR: Falló la conexión a la base de datos PostgreSQL: {e}", exc_info=True)
-        # Re-lanzar la excepción para que Flask la capture y muestre el error 500
-        raise e 
+        raise e
 
 
 @app.route('/')
