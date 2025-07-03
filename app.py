@@ -27,6 +27,45 @@ MONTERREY_TZ = pytz.timezone('America/Monterrey')
 
 DATABASE_URL = os.environ.get('DATABASE_URL') 
 
+# ===== AGREGAR LÍNEAS DE DEBUG =====
+print("🔍 DEBUG - Iniciando aplicación")
+print(f"DATABASE_URL configurada: {bool(DATABASE_URL)}")
+
+try:
+    # Función temporal para verificar rutas
+    def verificar_rutas_debug():
+        if not DATABASE_URL:
+            print("❌ DATABASE_URL no configurada")
+            return
+        
+        conn = psycopg2.connect(DATABASE_URL)
+        conn.cursor_factory = psycopg2.extras.RealDictCursor
+        cursor = conn.cursor()
+        
+        # Verificar rutas
+        cursor.execute("SELECT COUNT(*) as count FROM rutas")
+        rutas_count = cursor.fetchone()['count']
+        print(f"📊 Total de rutas en la base de datos: {rutas_count}")
+        
+        if rutas_count > 0:
+            cursor.execute("SELECT nombre, recorrido FROM rutas LIMIT 5")
+            sample_rutas = cursor.fetchall()
+            print("📋 Primeras 5 rutas:")
+            for ruta in sample_rutas:
+                print(f"  - {ruta['nombre']}: {ruta['recorrido']}")
+        else:
+            print("⚠️ No hay rutas en la base de datos")
+        
+        conn.close()
+    
+    verificar_rutas_debug()
+    
+except Exception as e:
+    print(f"❌ Error en debug de rutas: {e}")
+
+print("=" * 50)
+# ===== FIN DE LÍNEAS DE DEBUG =====
+
 # --- Funciones de Conversión de Hora ---
 def convert_to_24h(time_str_12h):
     if not time_str_12h:
