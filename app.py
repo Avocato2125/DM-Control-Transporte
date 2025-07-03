@@ -9,8 +9,17 @@ import psycopg2
 import psycopg2.extras 
 import logging 
 
-# Configurar logging básico para ver errores en la consola/logs de Railway
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# --- Configuración de Logging Avanzada ---
+# Asegúrate de que los logs se impriman en la consola (StreamHandler) y opcionalmente en un archivo
+# En Railway, los logs de StreamHandler van a los Deploy Logs.
+logging.basicConfig(
+    level=logging.INFO, # Nivel INFO para mensajes generales, DEBUG para depuración más profunda
+    format='%(asctime)s - %(levelname)s - %(name)s - %(message)s',
+    handlers=[
+        logging.StreamHandler() # Envía logs a la consola (donde Railway los recoge)
+        # logging.FileHandler('app.log') # Descomentar para guardar logs en un archivo local
+    ]
+)
 logger = logging.getLogger(__name__)
 
 
@@ -44,7 +53,7 @@ def convert_to_12h(time_str_24h):
     except ValueError:
         return None
 
-# Función de ayuda para conectar a la base de datos (¡CORRECTA PARA POSTGRESQL!)
+# Función de ayuda para conectar a la base de datos
 def get_db_connection():
     if not DATABASE_URL:
         logger.error("ERROR CRÍTICO: La variable de entorno 'DATABASE_URL' no está configurada para la conexión a DB.")
@@ -53,21 +62,62 @@ def get_db_connection():
     try:
         conn = psycopg2.connect(DATABASE_URL)
         logger.info("Conexión a la base de datos PostgreSQL exitosa.")
-        return conn
+        return conn 
     except Exception as e:
         logger.error(f"ERROR: Falló la conexión a la base de datos PostgreSQL: {e}", exc_info=True)
         raise e 
 
+# --- FUNCIÓN AUXILIAR PARA EJECUTAR CONSULTAS (¡NUEVA Y CRUCIAL!) ---
+def ejecutar_consulta(conn, query, params=None, fetch_all=False, fetch_one=False, dict_cursor=False):
+    """
+    Ejecuta una consulta SQL de forma segura y maneja la apertura/cierre del cursor.
+    :param conn: Objeto de conexión a la base de datos.
+    :param query: La cadena de la consulta SQL.
+    :param params: Tupla o lista de parámetros para la consulta.
+    :param fetch_all: Si es True, retorna todos los resultados de la consulta (para SELECT).
+    :param fetch_one: Si es True, retorna un solo resultado de la consulta (para SELECT).
+    :param dict_cursor: Si es True, el cursor devolverá resultados como diccionarios.
+    :return: Lista de diccionarios/tuplas, un diccionario/tupla, True para éxito de escritura, o None para error.
+    """
+    cursor = None
+    try:
+        # Crea el cursor con el factory adecuado
+        cursor_factory_type = psycopg2.extras.RealDictCursor if dict_cursor else None
+        cursor = conn.cursor(cursor_factory=cursor_factory_type)
+        
+        logger.debug(f"Ejecutando consulta: {query} con parámetros: {params}") # Debugging
+
+        cursor.execute(query, params or ())
+        
+        if fetch_all:
+            return cursor.fetchall()
+        if fetch_one:
+            return cursor.fetchone()
+        
+        # Si no es SELECT, commit la transacción
+        conn.commit()
+        return True # Éxito en operaciones de escritura
+    except psycopg2.Error as e:
+        conn.rollback() # Hacer rollback en caso de error SQL
+        logger.error(f"ERROR SQL en ejecutar_consulta: {e.pgerror if hasattr(e, 'pgerror') else str(e)}", exc_info=True)
+        logger.error(f"Consulta que falló: {query}")
+        logger.error(f"Parámetros usados: {params}")
+        raise # Re-lanzar la excepción para que sea manejada en la ruta
+    except Exception as e:
+        logger.error(f"Error inesperado en ejecutar_consulta: {e}", exc_info=True)
+        raise # Re-lanzar cualquier otra excepción
+    finally:
+        if cursor:
+            cursor.close()
+
+# --- Rutas de la Aplicación ---
 
 @app.route('/')
 def admin_dashboard():
-    conn = None # Inicializa conn para el finally
+    conn = None 
     try:
         conn = get_db_connection()
-        # ¡CORRECCIÓN CLAVE! Crear un cursor con RealDictCursor
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
-
-        asignaciones_raw = cursor.execute('''
+        query = '''
             SELECT
                 A.id_asignacion,
                 HS.hora_salida, 
@@ -83,44 +133,56 @@ def admin_dashboard():
             JOIN Rutas AS R ON A.id_ruta = R.id_ruta
             WHERE A.fecha >= %s 
             ORDER BY A.fecha, HS.hora_salida
-        ''', (datetime.date.today().strftime('%Y-%m-%d'),)).fetchall()
+        '''
+        # Usamos ejecutar_consulta para SELECT
+        asignaciones_raw = ejecutar_consulta(
+            conn, 
+            query, 
+            (datetime.date.today().strftime('%Y-%m-%d'),), 
+            fetch_all=True, 
+            dict_cursor=True
+        )
         
         conn.close() 
 
         asignaciones = []
-        for asignacion_row in asignaciones_raw:
-            asignacion_dict = asignacion_row # Ya es un diccionario gracias a RealDictCursor
-            asignacion_dict['hora_salida_12h'] = convert_to_12h(asignacion_dict['hora_salida'])
-            asignaciones.append(asignacion_dict)
+        if asignaciones_raw: # Asegurarse de que no sea None
+            for asignacion_row in asignaciones_raw:
+                asignacion_dict = asignacion_row 
+                asignacion_dict['hora_salida_12h'] = convert_to_12h(asignacion_dict['hora_salida'])
+                asignaciones.append(asignacion_dict)
         
         return render_template('admin_dashboard.html', asignaciones=asignaciones)
     except Exception as e:
         logger.error(f"Error al cargar admin_dashboard: {e}", exc_info=True)
         flash(f"Error al cargar el panel de administración: {e}. ¿Base de datos inicializada?", 'error')
-        # Asegura que la conexión se cierre si se abrió y ocurrió un error antes del close()
-        if 'conn' in locals() and conn: conn.close()
+        if conn: conn.close()
         return render_template('admin_dashboard.html', asignaciones=[]) 
 
 
 @app.route('/nueva_asignacion', methods=('GET', 'POST'))
 def nueva_asignacion():
     conn = None 
-    rutas = [] 
+    rutas_db = [] # Cambiado a rutas_db para evitar conflicto con la variable routes de la plantilla
     try: 
         conn = get_db_connection()
-        # ¡CORRECCIÓN CLAVE! Obtener un cursor con RealDictCursor para SELECT
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
         
-        orden_rutas = [
+        orden_rutas_nombres = [ # Lista de nombres para el orden
             'NUEVA ROSITA', 'CLOETE', 'AGUJITA', 'SABINAS', 'BARROTERAN',
             'ESPERANZAS', 'AURA', 'MUZQUIZ', 'PALAU', 'MANANTIALES'
         ]
-        order_case = "CASE nombre "
-        for i, ruta_name in enumerate(orden_rutas):
-            order_case += f"WHEN '{ruta_name}' THEN {i} "
-        order_case += "ELSE 99 END"
-        rutas = cursor.execute(f'SELECT id_ruta, nombre, recorrido FROM Rutas ORDER BY {order_case}, nombre').fetchall()
         
+        # NOTA: La vulnerabilidad de SQL Injection era en el ORDER BY dinámico.
+        # La forma segura es traer todas las rutas y ordenarlas en Python.
+        query_rutas = 'SELECT id_ruta, nombre, recorrido FROM Rutas'
+        rutas_no_ordenadas = ejecutar_consulta(conn, query_rutas, fetch_all=True, dict_cursor=True)
+        
+        # Ordenar las rutas en Python
+        # Mapear rutas a su índice en el orden personalizado
+        ruta_orden_map = {name: idx for idx, name in enumerate(orden_rutas_nombres)}
+        rutas = sorted(rutas_no_ordenadas, key=lambda x: ruta_orden_map.get(x['nombre'], 999)) # 999 para rutas no listadas al final
+        
+        conn.close() 
     except Exception as e:
         logger.error(f"Error al cargar formulario de nueva asignación (GET): {e}", exc_info=True)
         flash(f"Error al cargar rutas/horarios: {e}. ¿Base de datos inicializada?", 'error')
@@ -142,14 +204,15 @@ def nueva_asignacion():
             conn = None 
             try: 
                 conn = get_db_connection()
-                # ¡CORRECCIÓN AQUÍ! Obtener un cursor SIN RealDictCursor para operaciones de escritura/retorno de ID
+                # Para operaciones de escritura/retorno de ID, no necesitamos RealDictCursor
                 cursor = conn.cursor() 
-                cursor.execute("SELECT id_horario FROM HorariosSalida WHERE hora_salida = %s", (hora_salida_24h,))
-                horario_db = cursor.fetchone() 
+
+                # Buscar o crear horario
+                horario_db = ejecutar_consulta(conn, "SELECT id_horario FROM HorariosSalida WHERE hora_salida = %s", (hora_salida_24h,), fetch_one=True)
 
                 id_horario = None
                 if horario_db:
-                    id_horario = horario_db[0] # Acceder por índice 0 si es una tupla
+                    id_horario = horario_db[0] 
                 else:
                     cursor.execute("INSERT INTO HorariosSalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
                                 (hora_salida_24h, "Todos", False)) 
@@ -157,9 +220,11 @@ def nueva_asignacion():
                     id_horario = cursor.fetchone()[0] 
 
                 if id_horario:
-                    cursor.execute('INSERT INTO Asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
-                                (id_horario, id_ruta, numero_camion_manual, fecha)) 
-                    conn.commit()
+                    ejecutar_consulta(conn, 
+                                    'INSERT INTO Asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
+                                    (id_horario, id_ruta, numero_camion_manual, fecha),
+                                    fetch_all=False # No se esperan resultados
+                                    ) 
                     flash('Asignación creada exitosamente.', 'success')
                     return redirect(url_for('admin_dashboard'))
                 else:
@@ -180,10 +245,7 @@ def eliminar_asignacion(id_asignacion):
     conn = None
     try:
         conn = get_db_connection()
-        # ¡CORRECCIÓN AQUÍ! Obtener un cursor
-        cursor = conn.cursor() 
-        cursor.execute('DELETE FROM Asignaciones WHERE id_asignacion = %s', (id_asignacion,))
-        conn.commit()
+        ejecutar_consulta(conn, 'DELETE FROM Asignaciones WHERE id_asignacion = %s', (id_asignacion,), fetch_all=False)
         flash('Asignación eliminada exitosamente.', 'success')
     except Exception as e:
         logger.error(f"Error al eliminar asignación: {e}", exc_info=True)
@@ -198,9 +260,7 @@ def limpiar_asignaciones():
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() 
-        cursor.execute('DELETE FROM Asignaciones')
-        conn.commit()
+        ejecutar_consulta(conn, 'DELETE FROM Asignaciones', fetch_all=False)
         flash('Todas las asignaciones han sido eliminadas.', 'success')
     except Exception as e:
         logger.error(f"Error al limpiar asignaciones: {e}", exc_info=True)
@@ -218,36 +278,36 @@ def editar_asignacion(id_asignacion):
     rutas = [] 
     try:
         conn = get_db_connection()
-        # ¡CORRECCIÓN AQUÍ! Obtener un cursor con RealDictCursor
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
-        asignacion_base = cursor.execute('SELECT A.*, HS.hora_salida FROM Asignaciones A JOIN HorariosSalida HS ON A.id_horario = HS.id_horario WHERE A.id_asignacion = %s', (id_asignacion,)).fetchone()
+        # Obtener la asignación base
+        asignacion_base = ejecutar_consulta(conn, 
+                                            'SELECT A.*, HS.hora_salida FROM Asignaciones A JOIN HorariosSalida HS ON A.id_horario = HS.id_horario WHERE A.id_asignacion = %s', 
+                                            (id_asignacion,), 
+                                            fetch_one=True, 
+                                            dict_cursor=True)
         
         if asignacion_base is None:
             flash('Asignación no encontrada.', 'error')
-            # Necesitas cerrar la conexión aquí si sales de la función antes del finally
-            if conn: conn.close() 
             return redirect(url_for('admin_dashboard'))
 
         asignacion = dict(asignacion_base) 
         asignacion['hora_salida_12h'] = convert_to_12h(asignacion['hora_salida'])
 
-        orden_rutas = [
+        orden_rutas_nombres = [
             'NUEVA ROSITA', 'CLOETE', 'AGUJITA', 'SABINAS', 'BARROTERAN',
             'ESPERANZAS', 'AURA', 'MUZQUIZ', 'PALAU', 'MANANTIALES'
         ]
-        order_case = "CASE nombre "
-        for i, ruta_name in enumerate(orden_rutas):
-            order_case += f"WHEN '{ruta_name}' THEN {i} "
-        order_case += "ELSE 99 END"
-        rutas = cursor.execute(f'SELECT id_ruta, nombre, recorrido FROM Rutas ORDER BY {order_case}, nombre').fetchall()
+        query_rutas = 'SELECT id_ruta, nombre, recorrido FROM Rutas'
+        rutas_no_ordenadas = ejecutar_consulta(conn, query_rutas, fetch_all=True, dict_cursor=True)
+        
+        # Ordenar las rutas en Python
+        ruta_orden_map = {name: idx for idx, name in enumerate(orden_rutas_nombres)}
+        rutas = sorted(rutas_no_ordenadas, key=lambda x: ruta_orden_map.get(x['nombre'], 999))
         
     except Exception as e:
         logger.error(f"Error al cargar asignación para editar (GET): {e}", exc_info=True)
         flash(f"Error al cargar asignación: {e}. ¿Base de datos inicializada?", 'error')
-        # Asegura que la conexión se cierre si se abrió y ocurrió un error antes del close()
-        if 'conn' in locals() and conn: conn.close()
         return redirect(url_for('admin_dashboard'))
-    finally: # Asegura que la conexión se cierra si se abrió en el try
+    finally:
         if conn: conn.close() 
 
     if request.method == 'POST':
@@ -264,13 +324,13 @@ def editar_asignacion(id_asignacion):
             conn = None 
             try:
                 conn = get_db_connection()
-                cursor = conn.cursor() # Obtener cursor para POST (escritura)
-                cursor.execute("SELECT id_horario FROM HorariosSalida WHERE hora_salida = %s", (hora_salida_24h,))
-                horario_db = cursor.fetchone()
+                # Obtener un cursor (no necesitamos RealDictCursor aquí)
+                cursor = conn.cursor() 
+                horario_db = cursor.execute("SELECT id_horario FROM HorariosSalida WHERE hora_salida = %s", (hora_salida_24h,)).fetchone()
 
                 id_horario_nuevo = None
                 if horario_db:
-                    id_horario_nuevo = horario_db[0] # Acceder por índice
+                    id_horario_nuevo = horario_db[0] 
                 else:
                     cursor.execute("INSERT INTO HorariosSalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
                                 (hora_salida_24h, "Todos", False)) 
@@ -278,12 +338,12 @@ def editar_asignacion(id_asignacion):
                     id_horario_nuevo = cursor.fetchone()[0]
 
                 if id_horario_nuevo:
-                    cursor.execute('''
+                    ejecutar_consulta(conn, '''
                         UPDATE Asignaciones
                         SET id_horario = %s, id_ruta = %s, numero_camion_manual = %s, fecha = %s
                         WHERE id_asignacion = %s
-                    ''', (id_horario_nuevo, id_ruta, numero_camion_manual, fecha, id_asignacion))
-                    conn.commit()
+                    ''', (id_horario_nuevo, id_ruta, numero_camion_manual, fecha, id_asignacion), fetch_all=False)
+                    
                     flash('Asignación actualizada exitosamente.', 'success')
                     return redirect(url_for('admin_dashboard'))
                 else:
@@ -303,37 +363,35 @@ def editar_asignacion(id_asignacion):
 
 @app.route('/copiar_asignacion/<int:id_asignacion>', methods=('POST',))
 def copiar_asignacion(id_asignacion):
-    conn_fetch = None
-    conn_insert = None
+    conn = None # Usamos solo una conexión y la cerramos al final
     try:
-        conn_fetch = get_db_connection()
-        cursor_fetch = conn_fetch.cursor(cursor_factory=psycopg2.extras.RealDictCursor) # Obtener cursor para fetch
-        asignacion_original = cursor_fetch.execute('SELECT * FROM Asignaciones WHERE id_asignacion = %s', (id_asignacion,)).fetchone()
-        conn_fetch.close() # Cerrar conexión después de fetch
-
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) # Cursor para SELECT
+        asignacion_original = cursor.execute('SELECT * FROM Asignaciones WHERE id_asignacion = %s', (id_asignacion,)).fetchone()
+        
         if asignacion_original is None:
             flash('Asignación original no encontrada para copiar.', 'error')
             return redirect(url_for('admin_dashboard'))
 
-        conn_insert = get_db_connection() # Nueva conexión para la inserción
-        cursor_insert = conn_insert.cursor() # Obtener cursor para inserción
+        # Usar el mismo cursor o crear uno nuevo si se requiere (pero mejor usar el mismo para consistencia transaccional)
+        cursor_insert = conn.cursor() # Cursor para INSERT (no RealDictCursor)
         cursor_insert.execute('INSERT INTO Asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
                     (asignacion_original['id_horario'], asignacion_original['id_ruta'], asignacion_original['numero_camion_manual'], asignacion_original['fecha']))
-        conn_insert.commit()
+        conn.commit()
         flash('Asignación copiada exitosamente. Puedes editarla si necesitas cambiar la fecha/hora.', 'success')
     except Exception as e:
         logger.error(f"Error al copiar asignación: {e}", exc_info=True)
         flash(f'Error al copiar asignación: {e}', 'error')
     finally:
-        if conn_insert: # Asegura que la conexión de inserción se cierra
-            conn_insert.close()
+        if conn: 
+            conn.close()
     return redirect(url_for('admin_dashboard'))
 
 
 @app.route('/pantalla')
 def pantalla_personal():
     conn = None
-    try: # Añadido try-except para la conexión global a la vista
+    try: 
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) # Obtener cursor con RealDictCursor
         
@@ -361,7 +419,7 @@ def pantalla_personal():
 
         all_relevant_departures = []
         for row in all_relevant_departures_raw:
-            all_relevant_departures.append(row) # Ya son diccionarios, no necesitas dict() 
+            all_relevant_departures.append(row) 
 
         salidas_ahora_raw = []
         hora_activa_para_display_24h = None 
@@ -496,7 +554,6 @@ def pantalla_personal():
             conn.close()
         logger.error(f"Error al cargar pantalla_personal: {e}", exc_info=True)
         flash(f"Error crítico al cargar la pantalla de personal: {e}. ¿Base de datos inicializada?", 'error')
-        # Puedes crear una plantilla de error simple o redirigir
         return render_template('error_page.html', error_message=str(e)) # Crear error_page.html
 
 
