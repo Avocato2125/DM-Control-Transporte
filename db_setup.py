@@ -1,66 +1,100 @@
-# db_setup.py
+# db_setup.py - Versión PostgreSQL
 
-import sqlite3
+import os
+import psycopg2
 
 def crear_base_datos():
     """
-    Crea la base de datos SQLite y las tablas necesarias para el proyecto de transporte.
+    Crea la base de datos PostgreSQL y las tablas necesarias para el proyecto de transporte.
     """
+    # Obtener la URL de la base de datos desde las variables de entorno
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    
+    if not DATABASE_URL:
+        print("ERROR: La variable de entorno 'DATABASE_URL' no está configurada.")
+        return
+    
+    conn = None
     try:
-        conn = sqlite3.connect('transporte.db')
+        # Conectar a PostgreSQL
+        conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
+        
+        print("DEBUG: Conexión a PostgreSQL exitosa.")
 
         # Tabla Rutas
+        print("DEBUG: Intentando crear tabla Rutas...")
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Rutas (
-                id_ruta INTEGER PRIMARY KEY AUTOINCREMENT,
-                nombre TEXT NOT NULL,
+                id_ruta SERIAL PRIMARY KEY,
+                nombre VARCHAR(255) NOT NULL,
                 recorrido TEXT NOT NULL
             )
         ''')
+        print("DEBUG: Tabla Rutas creada o ya existente.")
 
-        # Tabla Camiones (Se mantiene por si en el futuro se quiere una lista predefinida)
+        # Tabla Camiones
+        print("DEBUG: Intentando crear tabla Camiones...")
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Camiones (
-                id_camion INTEGER PRIMARY KEY AUTOINCREMENT,
-                numero TEXT NOT NULL UNIQUE,
+                id_camion SERIAL PRIMARY KEY,
+                numero VARCHAR(255) NOT NULL UNIQUE,
                 capacidad INTEGER,
-                modelo TEXT
+                modelo VARCHAR(255)
             )
         ''')
+        print("DEBUG: Tabla Camiones creada o ya existente.")
 
         # Tabla HorariosSalida
+        print("DEBUG: Intentando crear tabla HorariosSalida...")
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS HorariosSalida (
-                id_horario INTEGER PRIMARY KEY AUTOINCREMENT,
-                hora_salida TEXT NOT NULL, -- Formato HH:MM
-                dias_semana TEXT NOT NULL, -- Ej. "Lunes,Martes", "Todos", "Sabado,Domingo"
-                es_especial BOOLEAN DEFAULT 0 -- 0 para falso, 1 para verdadero
+                id_horario SERIAL PRIMARY KEY,
+                hora_salida VARCHAR(5) NOT NULL,
+                dias_semana TEXT NOT NULL,
+                es_especial BOOLEAN DEFAULT FALSE
             )
         ''')
+        print("DEBUG: Tabla HorariosSalida creada o ya existente.")
 
-        # Tabla Asignaciones (MODIFICADA: Ahora usa numero_camion_manual TEXT)
+        # Tabla Asignaciones
+        print("DEBUG: Intentando crear tabla Asignaciones...")
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS Asignaciones (
-                id_asignacion INTEGER PRIMARY KEY AUTOINCREMENT,
-                id_horario INTEGER NOT NULL,
-                id_ruta INTEGER NOT NULL,
-                numero_camion_manual TEXT, -- AHORA ES UN CAMPO DE TEXTO, NO NECESITA NOT NULL
-                fecha TEXT NOT NULL, -- Formato YYYY-MM-DD
-                FOREIGN KEY (id_horario) REFERENCES HorariosSalida(id_horario),
-                FOREIGN KEY (id_ruta) REFERENCES Rutas(id_ruta)
-                -- Ya no hay FOREIGN KEY a Camiones, ya que el campo es de texto libre
+                id_asignacion SERIAL PRIMARY KEY,
+                id_horario INTEGER NOT NULL REFERENCES HorariosSalida(id_horario),
+                id_ruta INTEGER NOT NULL REFERENCES Rutas(id_ruta),
+                numero_camion_manual VARCHAR(255),
+                fecha DATE NOT NULL
             )
         ''')
+        print("DEBUG: Tabla Asignaciones creada o ya existente.")
 
         conn.commit()
-        print("Base de datos 'transporte.db' y tablas creadas exitosamente.")
+        print("Base de datos PostgreSQL y tablas creadas exitosamente.")
 
-    except sqlite3.Error as e:
-        print(f"Error al crear la base de datos: {e}")
+    except psycopg2.Error as e:
+        print(f"ERROR: Falló la conexión o la ejecución SQL en PostgreSQL: {e}")
+        if hasattr(e, 'pgcode'):
+            print(f"SQLSTATE: {e.pgcode}")
+        if hasattr(e, 'pgerror'):
+            print(f"Detalle: {e.pgerror}")
+    except Exception as e:
+        print(f"ERROR: Ocurrió un error inesperado: {e}")
     finally:
         if conn:
             conn.close()
+
+def get_db_connection():
+    """
+    Función helper para obtener una conexión a la base de datos PostgreSQL.
+    Úsala en tu app.py en lugar de sqlite3.connect()
+    """
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    if not DATABASE_URL:
+        raise Exception("DATABASE_URL no está configurada")
+    
+    return psycopg2.connect(DATABASE_URL)
 
 if __name__ == "__main__":
     crear_base_datos()
