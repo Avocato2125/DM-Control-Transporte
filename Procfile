@@ -1,1 +1,1 @@
-web: python init_db.py && python insert_data.py && gunicorn app:app --bind 0.0.0.0:$PORT
+web: python init_db.py && echo "Ejecutando insert_data.py..." && python insert_data.py && echo "insert_data.py completado" && gunicorn app:app --bind 0.0.0.0:$PORT
