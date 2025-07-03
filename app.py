@@ -1,4 +1,4 @@
-# app.py
+# app.py (CÓDIGO COMPLETO Y FINAL - CORRECCIONES DE SINTAXIS Y VARIABLES NO DEFINIDAS)
 
 from flask import Flask, render_template, request, redirect, url_for, flash
 import datetime
@@ -45,7 +45,7 @@ def convert_to_12h(time_str_24h):
     except ValueError:
         return None
 
-# Función de ayuda para conectar a la base de datos
+# Función de ayuda para conectar a la base de datos (¡CORRECTA PARA POSTGRESQL!)
 def get_db_connection():
     if not DATABASE_URL:
         logger.error("ERROR CRÍTICO: La variable de entorno 'DATABASE_URL' no está configurada para la conexión a DB.")
@@ -65,7 +65,6 @@ def admin_dashboard():
     conn = None 
     try:
         conn = get_db_connection()
-        # ¡CORRECCIÓN CLAVE! Crear un cursor con RealDictCursor para los SELECT
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
 
         asignaciones_raw = cursor.execute('''
@@ -90,7 +89,7 @@ def admin_dashboard():
 
         asignaciones = []
         for asignacion_row in asignaciones_raw:
-            asignacion_dict = asignacion_row # Ya es un diccionario gracias a RealDictCursor
+            asignacion_dict = asignacion_row 
             asignacion_dict['hora_salida_12h'] = convert_to_12h(asignacion_dict['hora_salida'])
             asignaciones.append(asignacion_dict)
         
@@ -108,7 +107,6 @@ def nueva_asignacion():
     rutas = [] 
     try: 
         conn = get_db_connection()
-        # ¡CORRECCIÓN CLAVE! Crear un cursor con RealDictCursor para los SELECT
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
         
         orden_rutas = [
@@ -119,9 +117,6 @@ def nueva_asignacion():
         for i, ruta_name in enumerate(orden_rutas):
             order_case += f"WHEN '{ruta_name}' THEN {i} "
         order_case += "ELSE 99 END"
-        # ¡CORRECCIÓN AQUÍ! Usar el cursor con el f-string para la consulta de rutas
-        # Asegúrate de que el f-string NO está directamente en cursor.execute,
-        # sino que la query se construye primero.
         query_rutas_ordered = f'SELECT id_ruta, nombre, recorrido FROM rutas ORDER BY {order_case}, nombre'
         rutas = cursor.execute(query_rutas_ordered).fetchall()
         
@@ -133,6 +128,12 @@ def nueva_asignacion():
         if conn: conn.close()
 
     if request.method == 'POST':
+        # Inicializar variables para asegurar que siempre estén definidas
+        hora_salida_24h = None
+        id_ruta = None
+        numero_camion_manual = None
+        fecha = None
+
         hora_salida_12h_input = request.form['hora_salida_libre'] 
         fecha = request.form['fecha']
         id_ruta = request.form['id_ruta']
@@ -146,7 +147,6 @@ def nueva_asignacion():
             conn = None 
             try: 
                 conn = get_db_connection()
-                # ¡CORRECCIÓN AQUÍ! Obtener un cursor SIN RealDictCursor para operaciones de escritura/retorno de ID
                 cursor = conn.cursor() 
                 cursor.execute("SELECT id_horario FROM horariossalida WHERE hora_salida = %s", (hora_salida_24h,))
                 horario_db = cursor.fetchone() 
@@ -184,7 +184,7 @@ def eliminar_asignacion(id_asignacion):
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() # Obtener un cursor
+        cursor = conn.cursor() 
         cursor.execute('DELETE FROM asignaciones WHERE id_asignacion = %s', (id_asignacion,))
         conn.commit()
         flash('Asignación eliminada exitosamente.', 'success')
@@ -201,7 +201,7 @@ def limpiar_asignaciones():
     conn = None
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() # Obtener un cursor
+        cursor = conn.cursor() 
         cursor.execute('DELETE FROM asignaciones')
         conn.commit()
         flash('Todas las asignaciones han sido eliminadas.', 'success')
@@ -217,11 +217,16 @@ def limpiar_asignaciones():
 @app.route('/editar_asignacion/<int:id_asignacion>', methods=('GET', 'POST'))
 def editar_asignacion(id_asignacion):
     conn = None
-    asignacion = None 
+    asignacion = None # Inicializa asignacion
     rutas = [] 
+    # Inicializa las variables para asegurar que siempre estén definidas en el POST si el GET falla
+    hora_salida_12h_input = None 
+    fecha = None
+    id_ruta = None
+    numero_camion_manual = None
+
     try:
         conn = get_db_connection()
-        # ¡CORRECCIÓN AQUÍ! Obtener un cursor con RealDictCursor
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) 
         asignacion_base = cursor.execute('SELECT A.*, HS.hora_salida FROM asignaciones AS A JOIN horariossalida AS HS ON A.id_horario = HS.id_horario WHERE A.id_asignacion = %s', (id_asignacion,)).fetchone()
         
@@ -305,7 +310,7 @@ def editar_asignacion(id_asignacion):
 
 @app.route('/copiar_asignacion/<int:id_asignacion>', methods=('POST',))
 def copiar_asignacion(id_asignacion):
-    conn = None # Usamos solo una conexión y la cerramos al final
+    conn = None 
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) # Cursor para SELECT
@@ -495,7 +500,7 @@ def pantalla_personal():
             conn.close()
         logger.error(f"Error al cargar pantalla_personal: {e}", exc_info=True)
         flash(f"Error crítico al cargar la pantalla de personal: {e}. ¿Base de datos inicializada?", 'error')
-        return render_template('error_page.html', error_message=str(e)) 
+        return render_template('error_page.html', error_message=str(e)) # Crear error_page.html
 
 
 if __name__ == '__main__':
