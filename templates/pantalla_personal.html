@@ -4,343 +4,429 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DM CONTROL - Salidas de Personal</title>
-    <meta http-equiv="refresh" content="10"> <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    <meta http-equiv="refresh" content="10"> 
+    <style>
+        * {
             margin: 0;
             padding: 0;
-            background-color: #2c3e50; /* Azul oscuro */
-            color: #ecf0f1; /* Gris claro */
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            color: #ffffff;
             display: flex;
             flex-direction: column;
             min-height: 100vh;
-            text-align: center;
+            overflow-x: hidden;
         }
+
+        /* Header */
         header {
-            background-color: #34495e;
-            padding: 10px 0;
-            font-size: 2em;
-            font-weight: bold;
-            letter-spacing: 2px;
-            border-bottom: 5px solid #2980b9;
-            flex-shrink: 0;
+            background: linear-gradient(90deg, #0066cc 0%, #004499 100%);
+            padding: 20px 0;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0, 102, 204, 0.3);
+            position: relative;
         }
+
+        header::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #ffffff 0%, #0066cc 50%, #ffffff 100%);
+        }
+
+        header h1 {
+            font-size: 3em;
+            font-weight: 700;
+            letter-spacing: 4px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            color: #ffffff;
+        }
+
+        /* Current Info Bar */
         .current-info {
-            background-color: #2980b9;
-            padding: 10px;
-            font-size: 1.4em;
-            font-weight: bold;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            background: linear-gradient(90deg, #000000 0%, #1a1a1a 50%, #000000 100%);
+            padding: 15px;
             display: flex;
-            justify-content: space-around;
+            justify-content: space-between;
             align-items: center;
-            flex-shrink: 0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+            border-bottom: 2px solid #0066cc;
         }
+
         .current-info span {
-            margin: 0 10px;
+            font-size: 1.6em;
+            font-weight: 600;
+            color: #ffffff;
+            background: rgba(0, 102, 204, 0.1);
+            padding: 8px 16px;
+            border-radius: 25px;
+            border: 1px solid #0066cc;
         }
+
+        /* Main Display */
         .main-display {
             flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            align-items: center;
-            padding: 20px;
-            overflow-y: auto; /* PERMITE EL SCROLL VERTICAL DENTRO DE ESTA SECCIÓN */
+            padding: 30px 20px;
+            overflow-y: auto;
         }
-        /* --- Contenedor de Salidas Programadas Ahora --- */
+
+        /* Current Departures Container */
         .current-departure-container {
-            background-color: #353434;
-            border-radius: 15px;
-            padding: 15px;
-            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-            margin-bottom: 20px;
-            width: 98%;
-            max-width: 1300px;
-            animation: pulse 2s infinite alternate;
-            box-sizing: border-box;
-            flex-shrink: 0;
-            padding-bottom: 0;
-        }
-        /* Contenedor interno para los grupos de ruta con carrusel */
-        .current-departure-routes-wrapper {
-            display: flex;
-            flex-wrap: nowrap;
-            gap: 10px;
-            justify-content: flex-start;
-            align-items: flex-start;
-            width: 100%;
-            overflow-x: hidden; /* OCULTAR SCROLL MANUAL */
-            padding-bottom: 10px; /* Espacio para el scrollbar simulado/visible */
+            background: linear-gradient(145deg, #ffffff 0%, #f0f0f0 100%);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 
+                0 10px 30px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            border: 2px solid #0066cc;
             position: relative;
-            height: auto;
-        }
-        .current-routes-track { /* El track que se moverá */
-            display: flex;
-            /* transition: transform 1s ease-in-out; <-- ELIMINADO para movimiento continuo */
-            height: 100%;
-            width: fit-content; /* Ocupa el ancho de su contenido real + clones */
-            min-width: 100%; /* Si no hay suficiente contenido, ocupa el 100% */
-            transform: translateX(0); /* Posición inicial */
-            will-change: transform; /* Optimización de rendimiento */
-        }
-
-        @keyframes pulse {
-            from { transform: scale(1); }
-            to { transform: scale(1.005); }
-        }
-        .current-departure-container h2 {
-            font-size: 2.2em;
-            margin-bottom: 8px;
-            color: #fff;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
-            width: 100%;
-            flex-shrink: 0;
-            text-align: center;
-        }
-        .current-departure-container .no-salida {
-            font-size: 1.8em;
-            color: #fff;
-            width: 100%;
-        }
-
-        /* --- Estilo para cada GRUPO DE RUTA dentro de "Ahora" --- */
-        .current-route-group {
-            background-color: rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-            padding: 8px;
-            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
-            flex-shrink: 0; /* IMPORANTE: no se encoge */
-            flex-grow: 1; /* Permite que crezca si hay espacio */
-            width: 250px; /* Ancho fijo para cada columna de ruta (ajustar si es necesario) */
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            margin-right: 10px; /* PARA EL GAP ENTRE ELEMENTOS DENTRO DEL TRACK */
-        }
-        .current-route-group:last-child {
-            margin-right: 0; /* No hay margen a la derecha para el último elemento */
-        }
-        .current-route-group h4 {
-            font-size: 1.4em;
-            color: #f1c40f;
-            margin-bottom: 6px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-            padding-bottom: 4px;
-            text-align: center;
-            flex-shrink: 0;
-            white-space: nowrap;
             overflow: hidden;
-            text-overflow: ellipsis;
         }
-        .current-route-group .current-time-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            overflow-y: auto; /* Scroll vertical si hay muchas sub-items */
-            flex-grow: 1;
+
+        .current-departure-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #0066cc 0%, #004499 50%, #0066cc 100%);
+            animation: shimmer 3s ease-in-out infinite;
         }
-        .current-route-group .current-time-list li {
-            margin-bottom: 8px;
-            border-radius: 8px;
-            padding: 0;
+
+        @keyframes shimmer {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
         }
-        .current-route-group .current-time-list li:last-child {
-            margin-bottom: 0;
-        }
-        .current-route-group .current-time-list li strong {
-            display: block;
-            font-size: 1.2em;
-            color: #ecf0f1;
-            margin-bottom: 4px;
+
+        .current-departure-container h2 {
+            font-size: 2.5em;
+            color: #000000;
             text-align: center;
-            border-bottom: 1px dotted rgba(255,255,255,0.15);
-            padding-bottom: 2px;
-        }
-        .current-route-group .current-departure-item-card {
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 5px;
-            padding: 6px;
-            margin-top: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            text-align: left;
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            flex-wrap: wrap; 
-            gap: 3px 8px; 
-        }
-        .current-route-group .current-departure-item-card span {
-            font-size: 1em;
-            margin: 0;
-            font-weight: normal;
-            color: #ecf0f1;
-            flex-grow: 1; 
-            min-width: 40%; 
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
-        }
-        .current-route-group .current-departure-item-card p,
-        .current-route-group .current-departure-item-card p strong {
-            display: none;
+            margin-bottom: 20px;
+            font-weight: 700;
+            text-shadow: 1px 1px 2px rgba(0, 102, 204, 0.3);
         }
 
-
-        /* --- Estilos para el Carrusel de Próximas Salidas (ya adaptados) --- */
-        .next-departures {
-            width: 95%;
-            max-width: 1100px;
-            margin-top: 20px;
-            border-radius: 10px;
-            padding: 0;
-            box-shadow: none;
-            flex-shrink: 0;
-        }
-        .next-departures h3 {
+        .current-departure-container .no-salida {
             font-size: 2em;
-            color: #f1c40f;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #f1c40f;
-            padding-bottom: 8px;
+            color: #0066cc;
             text-align: center;
+            font-weight: 600;
+            padding: 40px;
         }
+
+        /* Routes Wrapper */
+        .current-departure-routes-wrapper {
+            overflow: hidden;
+            border-radius: 15px;
+        }
+
+        .current-routes-track {
+            display: flex;
+            transition: transform 0.5s ease;
+            gap: 20px;
+        }
+
+        /* Current Route Groups */
+        .current-route-group {
+            background: linear-gradient(145deg, #000000 0%, #1a1a1a 100%);
+            border-radius: 15px;
+            padding: 20px;
+            min-width: 300px;
+            flex-shrink: 0;
+            border: 2px solid #0066cc;
+            box-shadow: 0 8px 25px rgba(0, 102, 204, 0.2);
+            position: relative;
+        }
+
+        .current-route-group::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 40px;
+            height: 40px;
+            background: #0066cc;
+            clip-path: polygon(100% 0, 0 0, 100% 100%);
+        }
+
+        .current-route-group h4 {
+            font-size: 1.6em;
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: linear-gradient(90deg, #0066cc 0%, #004499 100%);
+            border-radius: 10px;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .current-time-list {
+            list-style: none;
+        }
+
+        .current-time-list li {
+            margin-bottom: 15px;
+        }
+
+        .current-time-list li strong {
+            display: block;
+            font-size: 1.3em;
+            color: #0066cc;
+            text-align: center;
+            margin-bottom: 10px;
+            font-weight: 700;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+        }
+
+        .current-departure-item-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f8f8 100%);
+            border-radius: 10px;
+            padding: 12px;
+            margin-top: 8px;
+            border: 1px solid #0066cc;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .current-departure-item-card span {
+            color: #000000;
+            font-weight: 600;
+            font-size: 1.1em;
+        }
+
+        .current-departure-item-card span:last-child {
+            background: #0066cc;
+            color: #ffffff;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 1em;
+        }
+
+        /* Next Departures Section */
+        .next-departures {
+            width: 100%;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .next-departures h3 {
+            font-size: 2.5em;
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background: linear-gradient(90deg, #000000 0%, #0066cc 50%, #000000 100%);
+            border-radius: 15px;
+            border: 2px solid #ffffff;
+            font-weight: 700;
+            letter-spacing: 2px;
+        }
+
         .carousel-container {
             position: relative;
             width: 100%;
             overflow: hidden;
-            height: 350px;
+            height: 400px;
+            border-radius: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid #0066cc;
         }
+
         .carousel-track {
             display: flex;
             transition: transform 1s ease-in-out;
             height: 100%;
-            width: fit-content;
-            min-width: 100%;
-            align-items: flex-start;
+            gap: 15px;
+            padding: 15px;
         }
+
         .route-group {
             flex-shrink: 0;
-            width: calc(100% / 5);
-            padding: 0 10px;
-            box-sizing: border-box;
-            height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            text-align: left;
-            background-color: #3f5872;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            width: calc(20% - 12px);
+            background: linear-gradient(145deg, #ffffff 0%, #f0f0f0 100%);
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #000000;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
             overflow-y: auto;
+            position: relative;
         }
-        .route-group + .route-group {
-            margin-left: 10px;
+
+        .route-group::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #0066cc 0%, #004499 100%);
+            border-radius: 15px 15px 0 0;
         }
+
         .route-group h4 {
-            font-size: 1.5em;
-            color: #ecf0f1;
-            margin-bottom: 10px;
-            border-bottom: 1px dashed #7f8c8d;
-            padding-bottom: 5px;
+            font-size: 1.4em;
+            color: #000000;
             text-align: center;
-            flex-shrink: 0;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: linear-gradient(135deg, #0066cc 0%, #004499 100%);
+            color: #ffffff;
+            border-radius: 10px;
+            font-weight: 600;
         }
-        .route-group .time-list {
+
+        .time-list {
             list-style: none;
-            padding: 0;
-            margin: 0;
-            flex-grow: 1;
         }
-        .route-group .time-list li {
-            margin-bottom: 10px;
+
+        .time-list li {
+            margin-bottom: 15px;
         }
-        .route-group .time-list li:last-child {
-            margin-bottom: 0;
-        }
-        .route-group .time-list li strong {
+
+        .time-list li strong {
             display: block;
-            font-size: 1.3em;
-            margin-bottom: 5px;
-            color: #f1c40f;
+            font-size: 1.2em;
+            color: #0066cc;
             text-align: center;
-            border-bottom: 1px dotted rgba(255,255,255,0.15);
-            padding-bottom: 3px;
+            margin-bottom: 8px;
+            font-weight: 700;
+            padding: 6px;
+            background: rgba(0, 102, 204, 0.1);
+            border-radius: 6px;
         }
-        .route-group .time-list .route-item-card {
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 5px;
-            padding: 8px;
-            margin-top: 5px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            text-align: left;
+
+        .route-item-card {
+            background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 6px;
+            border: 1px solid #0066cc;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap;
-            gap: 5px 10px;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
         }
-        .route-group .time-list .route-item-card span {
-            font-size: 1.1em;
-            margin: 0;
-            font-weight: normal;
-            color: #ecf0f1;
-            flex-grow: 1; 
-            min-width: 45%; 
-            white-space: nowrap; 
-            overflow: hidden; 
-            text-overflow: ellipsis; 
+
+        .route-item-card span {
+            color: #ffffff;
+            font-weight: 500;
         }
-        .route-group .time-list .route-item-card p,
-        .route-group .time-list .route-item-card p strong {
-            display: none;
+
+        .route-item-card span:last-child {
+            background: #0066cc;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 0.9em;
+            font-weight: 600;
         }
-        
+
+        /* Footer */
         footer {
-            background-color: #34495e;
-            padding: 8px 0;
-            margin-top: auto;
-            font-size: 1.1em;
-            border-top: 5px solid #2980b9;
-            flex-shrink: 0;
+            background: linear-gradient(90deg, #000000 0%, #0066cc 50%, #000000 100%);
+            padding: 15px 0;
+            text-align: center;
+            border-top: 3px solid #ffffff;
+            color: #ffffff;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .route-group {
+                width: calc(25% - 12px);
+            }
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2em;
+            }
+            
+            .current-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .current-info span {
+                font-size: 1.3em;
+            }
+            
+            .current-departure-container h2 {
+                font-size: 1.8em;
+            }
+            
+            .route-group {
+                width: calc(50% - 12px);
+            }
+        }
+
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #000000;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #0066cc;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #004499;
         }
     </style>
 </head>
 <body>
     <header>
-        DM CONTROL
+        <h1>DM CONTROL</h1>
     </header>
 
     <div class="current-info">
-        <span>Fecha: {{ fecha_actual }}</span>
-        <span>Hora Actual: {{ hora_actual }}</span>
+        <span>📅 {{ fecha_actual }}</span>
+        <span>🕒 {{ hora_actual }}</span>
     </div>
 
     <div class="main-display">
         <div class="current-departure-container">
-            {# Título de la sección de Salidas Programadas Ahora #}
             {% if hora_activa_para_display_12h and fecha_activa_para_display %}
-                <h2>¡Salidas Programadas Ahora! ({{ hora_activa_para_display_12h }} - {{ fecha_activa_para_display }})</h2>
+                <h2>🚌 Salidas Activas ({{ hora_activa_para_display_12h }} - {{ fecha_activa_para_display }})</h2>
             {% else %}
-                <h2>¡Salidas Programadas Ahora!</h2>
+                <h2>🚌 Salidas Programadas Ahora</h2>
             {% endif %}
 
-            {# Lista de asignaciones activas - AHORA AGRUPADAS POR RUTA EN COLUMNAS #}
             {% if salidas_ahora_agrupadas_por_ruta %}
-                {# Contenedor flex para los grupos de rutas #}
                 <div class="current-departure-routes-wrapper">
-                    <div class="current-routes-track" id="currentDepartureTrack"> {# ID para JS #}
+                    <div class="current-routes-track" id="currentDepartureTrack">
                         {% for ruta_grupo_ahora in salidas_ahora_agrupadas_por_ruta %}
-                            <div class="current-route-group"> {# Agrupación por Ruta #}
+                            <div class="current-route-group">
                                 <h4>{{ ruta_grupo_ahora.nombre_ruta }}</h4>
                                 <ul class="current-time-list">
                                     {% for fecha_hora_grupo_ahora in ruta_grupo_ahora.grupos_por_fecha_hora %}
-                                        <li> {# Agrupación por Fecha y Hora dentro de la Ruta #}
-                                            <strong>{{ fecha_hora_grupo_ahora.fecha }} - {{ fecha_hora_grupo_ahora.hora }}</strong> <br>
+                                        <li>
+                                            <strong>🕐 {{ fecha_hora_grupo_ahora.fecha }} - {{ fecha_hora_grupo_ahora.hora }}</strong>
                                             {% for salida in fecha_hora_grupo_ahora.salidas %}
-                                                {# Cada asignación individual dentro de la hora tiene su propia "tarjeta" #}
                                                 <div class="current-departure-item-card">
-                                                    <span>{{ salida.recorrido }}</span>
+                                                    <span>📍 {{ salida.recorrido }}</span>
                                                     <span>{{ salida.numero_camion_manual if salida.numero_camion_manual else 'Pendiente' }}</span>
                                                 </div>
                                             {% endfor %}
@@ -352,13 +438,12 @@
                     </div>
                 </div>
             {% else %}
-                <p class="no-salida">No hay salidas programadas activas en este momento.</p>
+                <p class="no-salida">⏰ No hay salidas activas en este momento</p>
             {% endif %}
         </div>
 
-        {# --- Sección del Carrusel de Próximas Salidas --- #}
         <div class="next-departures">
-            <h3>Próximas Salidas:</h3>
+            <h3>📋 Próximas Salidas</h3>
             {% if proximas_salidas_agrupadas_por_ruta %}
                 <div class="carousel-container">
                     <div class="carousel-track" id="carouselTrack">
@@ -368,10 +453,10 @@
                                 <ul class="time-list">
                                     {% for fecha_hora_grupo in ruta_grupo.grupos_por_fecha_hora %}
                                         <li>
-                                            <strong>{{ fecha_hora_grupo.fecha }} - {{ fecha_hora_grupo.hora }}</strong> <br>
+                                            <strong>🕐 {{ fecha_hora_grupo.fecha }} - {{ fecha_hora_grupo.hora }}</strong>
                                             {% for salida in fecha_hora_grupo.salidas %}
                                                 <div class="route-item-card">
-                                                    <span>{{ salida.recorrido }}</span>
+                                                    <span>📍 {{ salida.recorrido }}</span>
                                                     <span>{{ salida.numero_camion_manual if salida.numero_camion_manual else 'Pendiente' }}</span>
                                                 </div>
                                             {% endfor %}
@@ -383,15 +468,15 @@
                     </div>
                 </div>
             {% else %}
-                <div class="carousel-container" style="justify-content: center; align-items: center; color: #bdc3c7; font-size: 1.5em; display: flex; height: 350px;">
-                    <p>No hay próximas salidas programadas.</p>
+                <div class="carousel-container" style="display: flex; justify-content: center; align-items: center;">
+                    <p style="color: #ffffff; font-size: 1.8em; font-weight: 600;">📅 No hay próximas salidas programadas</p>
                 </div>
             {% endif %}
         </div>
     </div>
 
     <footer>
-        Actualizado automáticamente cada 10 segundos.
+        🔄 Actualizado automáticamente cada 10 segundos
     </footer>
 
     <script>
@@ -438,63 +523,56 @@
         // --- Carrusel de Salidas Programadas Ahora (superior) ---
         const currentDepartureTrack = document.getElementById('currentDepartureTrack');
         const currentRouteGroups = currentDepartureTrack ? currentDepartureTrack.querySelectorAll('.current-route-group') : [];
-        let currentPosition = 0; // Posición actual de desplazamiento en píxeles
-        const scrollSpeed = 1; // Velocidad de desplazamiento en píxeles por fotograma
-        let currentAnimationId; // Para requestAnimationFrame
+        let currentPosition = 0;
+        const scrollSpeed = 1;
+        let currentAnimationId;
 
         function animateContinuousScroll() {
             if (!currentDepartureTrack || currentRouteGroups.length === 0) {
-                // Si no hay track o grupos, limpiar cualquier animación y salir
                 if (currentAnimationId) cancelAnimationFrame(currentAnimationId);
                 currentAnimationId = null;
                 return;
             }
 
-            const totalScrollWidth = currentDepartureTrack.scrollWidth; // Ancho total del contenido scrollable
-            const visibleWidth = currentDepartureTrack.offsetWidth; // Ancho visible del contenedor
+            const totalScrollWidth = currentDepartureTrack.scrollWidth;
+            const visibleWidth = currentDepartureTrack.offsetWidth;
 
-            // Solo animar si el contenido es más grande que el área visible
             if (totalScrollWidth <= visibleWidth) {
-                currentDepartureTrack.style.transform = `translateX(0px)`; // Asegurarse de que esté al inicio
+                currentDepartureTrack.style.transform = `translateX(0px)`;
                 if (currentAnimationId) cancelAnimationFrame(currentAnimationId);
                 currentAnimationId = null;
                 return;
             }
 
-            currentPosition -= scrollSpeed; // Mover hacia la izquierda
+            currentPosition -= scrollSpeed;
 
-            // Cuando el contenido original ha pasado completamente, reiniciamos la posición
-            // Esto causará un "salto" al inicio, ya que no hay clonación de elementos.
             if (Math.abs(currentPosition) >= totalScrollWidth) {
-                currentPosition = 0; // Reinicia para volver al principio
+                currentPosition = 0;
             }
             
             currentDepartureTrack.style.transform = `translateX(${currentPosition}px)`;
-            currentAnimationId = requestAnimationFrame(animateContinuousScroll); // Siguiente fotograma
+            currentAnimationId = requestAnimationFrame(animateContinuousScroll);
         }
 
         function startContinuousScroll() {
-            if (currentAnimationId) cancelAnimationFrame(currentAnimationId); // Detener si ya hay una animación
+            if (currentAnimationId) cancelAnimationFrame(currentAnimationId);
 
-            // Necesitamos un pequeño retraso antes de empezar la animación para asegurar que los anchos se calculen bien
             setTimeout(() => {
                 const totalScrollWidth = currentDepartureTrack.scrollWidth;
                 const visibleWidth = currentDepartureTrack.offsetWidth;
                 if (totalScrollWidth > visibleWidth) {
-                    currentPosition = 0; // Asegurarse de empezar desde el inicio
-                    animateContinuousScroll(); // Iniciar la animación
+                    currentPosition = 0;
+                    animateContinuousScroll();
                 } else {
-                    currentDepartureTrack.style.transform = `translateX(0px)`; // No hay scroll si no es necesario
+                    currentDepartureTrack.style.transform = `translateX(0px)`;
                 }
-            }, 500); // Pequeño retraso
+            }, 500);
         }
 
-        startContinuousScroll(); // Iniciar al cargar la página
+        startContinuousScroll();
 
-
-        // --- Manejo de redimensionamiento de ventana (para ambos) ---
+        // --- Manejo de redimensionamiento de ventana ---
         window.addEventListener('resize', () => {
-            // Carrusel inferior (paginado)
             clearInterval(intervalId);
             intervalId = null;
             currentIndex = 0;
@@ -503,8 +581,7 @@
                 intervalId = setInterval(updateCarousel, 5000);
             }
 
-            // Carrusel superior (continuo)
-            startContinuousScroll(); // Reiniciar la animación continua
+            startContinuousScroll();
         });
     </script>
 </body>
