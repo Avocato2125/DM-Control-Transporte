@@ -147,8 +147,6 @@
             position: relative;
         }
 
-        /* ELIMINADO: .current-route-group::after (triángulo azul) */
-
         .current-route-group h4 {
             font-size: 1.6em;
             color: #ffffff;
@@ -510,64 +508,71 @@
        
         updateCarousel(); 
 
-        // --- Scroll infinito suave para salidas activas ---
+        // --- Scroll continuo simple (solo cuando hay 4+ elementos) ---
         const currentDepartureTrack = document.getElementById('currentDepartureTrack');
         let currentPosition = 0;
-        const scrollSpeed = 0.5;
+        const scrollSpeed = 1;
         let currentAnimationId;
+        const MIN_ELEMENTS = 4; // Mínimo de elementos para activar scroll
 
-        function setupInfiniteScroll() {
+        function startSimpleContinuousScroll() {
             if (!currentDepartureTrack) return;
 
-            const originalGroups = currentDepartureTrack.querySelectorAll('.current-route-group');
-            if (originalGroups.length === 0) return;
-
-            // Duplicar el contenido para crear el efecto infinito
-            const clonedGroups = [];
-            originalGroups.forEach(group => {
-                const clone = group.cloneNode(true);
-                clonedGroups.push(clone);
-                currentDepartureTrack.appendChild(clone);
-            });
-
-            // Calcular el ancho del contenido original
-            const originalWidth = Array.from(originalGroups).reduce((total, group) => {
-                return total + group.offsetWidth + 20; // 20px es el gap
-            }, 0);
-
-            function animateInfiniteScroll() {
-                if (!currentDepartureTrack) {
-                    if (currentAnimationId) cancelAnimationFrame(currentAnimationId);
-                    return;
+            const routeGroups = currentDepartureTrack.querySelectorAll('.current-route-group');
+            
+            // Solo activar scroll si hay 4 o más elementos
+            if (routeGroups.length < MIN_ELEMENTS) {
+                // Si hay pocos elementos, mantener estático
+                currentDepartureTrack.style.transform = 'translateX(0px)';
+                if (currentAnimationId) {
+                    cancelAnimationFrame(currentAnimationId);
+                    currentAnimationId = null;
                 }
-
-                const containerWidth = currentDepartureTrack.parentElement.offsetWidth;
-                
-                // Solo animar si el contenido es más ancho que el contenedor
-                if (originalWidth <= containerWidth) {
-                    currentDepartureTrack.style.transform = `translateX(0px)`;
-                    if (currentAnimationId) cancelAnimationFrame(currentAnimationId);
-                    return;
-                }
-
-                currentPosition -= scrollSpeed;
-
-                // Cuando hemos movido exactamente el ancho del contenido original,
-                // reiniciamos sin salto visible (porque tenemos contenido duplicado)
-                if (Math.abs(currentPosition) >= originalWidth) {
-                    currentPosition = 0;
-                }
-
-                currentDepartureTrack.style.transform = `translateX(${currentPosition}px)`;
-                currentAnimationId = requestAnimationFrame(animateInfiniteScroll);
+                return;
             }
 
-            // Iniciar la animación
-            animateInfiniteScroll();
+            // Calcular ancho total del contenido
+            const containerWidth = currentDepartureTrack.parentElement.offsetWidth;
+            const totalWidth = currentDepartureTrack.scrollWidth;
+
+            // Solo hacer scroll si el contenido es más ancho que el contenedor
+            if (totalWidth <= containerWidth) {
+                currentDepartureTrack.style.transform = 'translateX(0px)';
+                return;
+            }
+
+            function animate() {
+                if (!currentDepartureTrack) {
+                    if (currentAnimationId) {
+                        cancelAnimationFrame(currentAnimationId);
+                        currentAnimationId = null;
+                    }
+                    return;
+                }
+
+                // Mover hacia la izquierda continuamente
+                currentPosition -= scrollSpeed;
+
+                // Cuando llega al final, reiniciar desde el principio
+                const maxScroll = totalWidth - containerWidth;
+                if (Math.abs(currentPosition) >= maxScroll) {
+                    currentPosition = 0; // Reinicio simple
+                }
+
+                // Aplicar transformación
+                currentDepartureTrack.style.transform = `translateX(${currentPosition}px)`;
+                
+                // Continuar animación
+                currentAnimationId = requestAnimationFrame(animate);
+            }
+
+            // Iniciar animación
+            currentPosition = 0;
+            animate();
         }
 
         // Inicializar después de que el DOM esté listo
-        setTimeout(setupInfiniteScroll, 1000);
+        setTimeout(startSimpleContinuousScroll, 1000);
 
         // --- Manejo de redimensionamiento de ventana ---
         window.addEventListener('resize', () => {
@@ -579,7 +584,7 @@
                 intervalId = setInterval(updateCarousel, 5000);
             }
 
-            setupInfiniteScroll();
+            startSimpleContinuousScroll();
         });
     </script>
 </body>
