@@ -23,48 +23,44 @@
         }
         .actions {
             margin-bottom: 20px;
-            display: flex; /* Para alinear los botones */
-            gap: 10px; /* Espacio entre los botones */
-            flex-wrap: wrap; /* Para que los botones se ajusten en pantallas pequeñas */
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
         }
-        /* Estilos generales para todos los botones de acción */
         .actions a, 
         .actions button,
-        .action-buttons-group a, /* Aplica también a los botones de la tabla */
+        .action-buttons-group a,
         .action-buttons-group button {
             display: inline-block;
-            padding: 8px 12px; /* Un poco más de padding */
-            font-size: 0.95em; /* Ligeramente más grande */
-            font-weight: bold; /* Negrita */
+            padding: 8px 12px;
+            font-size: 0.95em;
+            font-weight: bold;
             color: white;
             text-decoration: none;
-            border-radius: 5px; /* Bordes redondeados */
+            border-radius: 5px;
             border: none;
             cursor: pointer;
-            transition: background-color 0.3s ease, transform 0.1s ease; /* Transición suave */
+            transition: background-color 0.3s ease, transform 0.1s ease;
             text-align: center;
         }
-        /* Efecto hover general */
         .actions a:hover, 
         .actions button:hover,
         .action-buttons-group a:hover,
         .action-buttons-group button:hover {
             opacity: 0.9;
-            transform: translateY(-1px); /* Pequeño levantamiento */
+            transform: translateY(-1px);
         }
 
-        /* Estilos específicos para los botones principales (Crear, Ver, Limpiar) */
-        .actions .create-btn { /* Clase añadida para el botón Crear Nueva Asignación */
-            background-color: #28a745; /* Verde vibrante */
+        .actions .create-btn {
+            background-color: #28a745;
         }
-        .actions .view-btn { /* Clase añadida para el botón Ver Pantalla */
-            background-color: #17a2b8; /* Azul claro para ver */
+        .actions .view-btn {
+            background-color: #17a2b8;
         }
         .actions .delete-all-btn {
-            background-color: #dc3545; /* Rojo para eliminar todo */
+            background-color: #dc3545;
         }
 
-        /* Estilos específicos para los botones de la tabla (Editar, Copiar, Eliminar) */
         .action-buttons-group {
             display: flex;
             gap: 5px;
@@ -72,14 +68,14 @@
             justify-content: flex-start;
         }
         .action-buttons-group .edit-btn {
-            background-color: #007bff; /* Azul vibrante */
+            background-color: #007bff;
         }
         .action-buttons-group .copy-btn {
-            background-color: #ffc107; /* Amarillo para copiar */
-            color: #343a40; /* Texto oscuro para contraste */
+            background-color: #ffc107;
+            color: #343a40;
         }
         .action-buttons-group .delete-single-btn {
-            background-color: #6c757d; /* Gris oscuro para eliminar individual */
+            background-color: #6c757d;
         }
 
         table {
@@ -96,7 +92,7 @@
             background-color: #f2f2f2;
         }
 
-        /* NUEVOS ESTILOS PARA INDICADORES DE ESTADO */
+        /* Estilos para indicadores de estado */
         .status-indicator {
             display: inline-block;
             padding: 2px 8px;
@@ -157,18 +153,7 @@
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
-        .action-buttons-group { /* Para alinear los botones de acción en la tabla */
-            display: flex;
-            gap: 5px;
-            flex-wrap: wrap;
-            justify-content: flex-start;
-        }
-        .action-buttons-group button {
-            padding: 5px 10px;
-            font-size: 0.85em;
-        }
 
-        /* Leyenda de estados */
         .status-legend {
             margin: 15px 0;
             padding: 10px;
@@ -240,27 +225,9 @@
                 </thead>
                 <tbody>
                     {% for asignacion in asignaciones %}
-                    {% set now = moment() %}
-                    {% set asignacion_datetime = moment(asignacion.fecha + ' ' + asignacion.hora_salida) %}
-                    {% set diff_minutes = (asignacion_datetime.timestamp - now.timestamp) / 60 %}
-                    
-                    {% if diff_minutes >= -30 and diff_minutes <= 30 %}
-                        {% set status_class = "row-active" %}
-                        {% set status_indicator = "status-active" %}
-                        {% set status_text = "🔄 Activa" %}
-                    {% elif diff_minutes > 30 %}
-                        {% set status_class = "row-upcoming" %}
-                        {% set status_indicator = "status-upcoming" %}
-                        {% set status_text = "⏰ Próxima" %}
-                    {% else %}
-                        {% set status_class = "row-completed" %}
-                        {% set status_indicator = "status-completed" %}
-                        {% set status_text = "✅ Completada" %}
-                    {% endif %}
-
-                    <tr class="{{ status_class }}">
+                    <tr data-fecha="{{ asignacion.fecha }}" data-hora="{{ asignacion.hora_salida }}">
                         <td>
-                            <span class="status-indicator {{ status_indicator }}">{{ status_text }}</span>
+                            <span class="status-indicator">⏳ Calculando...</span>
                         </td>
                         <td>{{ asignacion.fecha }}</td>
                         <td>{{ asignacion.hora_salida_12h if asignacion.hora_salida_12h else asignacion.hora_salida }}</td>
@@ -270,15 +237,12 @@
                         <td>{{ asignacion.numero_camion_manual if asignacion.numero_camion_manual else 'Pendiente' }}</td>
                         <td>
                             <div class="action-buttons-group">
-                                {# Botón Editar #}
                                 <a href="{{ url_for('editar_asignacion', id_asignacion=asignacion.id_asignacion) }}" class="edit-btn">Editar</a>
                                 
-                                {# Botón Copiar #}
                                 <form action="{{ url_for('copiar_asignacion', id_asignacion=asignacion.id_asignacion) }}" method="POST" onsubmit="return confirm('¿Estás seguro de que quieres copiar esta asignación?');">
                                     <button type="submit" class="copy-btn">Copiar</button>
                                 </form>
 
-                                {# Botón Eliminar #}
                                 <form action="{{ url_for('eliminar_asignacion', id_asignacion=asignacion.id_asignacion) }}" method="POST" onsubmit="return confirm('¿Estás seguro de que quieres eliminar esta asignación?');">
                                     <button type="submit" class="delete-single-btn">Eliminar</button>
                                 </form>
@@ -294,60 +258,49 @@
     </div>
 
     <script>
-        // Script para calcular el estado en tiempo real sin depender de Jinja2
+        // Script para calcular el estado en tiempo real
         document.addEventListener('DOMContentLoaded', function() {
-            const rows = document.querySelectorAll('tbody tr');
+            updateStatus();
+        });
+
+        function updateStatus() {
+            const rows = document.querySelectorAll('tbody tr[data-fecha]');
             
             rows.forEach(function(row) {
-                const fechaCell = row.cells[1].textContent.trim();
-                const horaCell = row.cells[2].textContent.trim();
+                const fecha = row.getAttribute('data-fecha');
+                const hora = row.getAttribute('data-hora');
                 
-                // Convertir la hora de 12h a 24h si es necesario
-                let hora24 = horaCell;
-                if (horaCell.includes('AM') || horaCell.includes('PM')) {
-                    const [time, period] = horaCell.split(' ');
-                    let [hours, minutes] = time.split(':');
-                    hours = parseInt(hours);
-                    
-                    if (period === 'PM' && hours !== 12) {
-                        hours += 12;
-                    } else if (period === 'AM' && hours === 12) {
-                        hours = 0;
-                    }
-                    
-                    hora24 = `${hours.toString().padStart(2, '0')}:${minutes}`;
-                }
-                
-                const asignacionDateTime = new Date(`${fechaCell} ${hora24}`);
+                // Crear fecha y hora de la asignación
+                const asignacionDateTime = new Date(`${fecha} ${hora}`);
                 const now = new Date();
                 const diffMinutes = (asignacionDateTime.getTime() - now.getTime()) / (1000 * 60);
                 
                 // Limpiar clases existentes
                 row.classList.remove('row-active', 'row-upcoming', 'row-completed');
                 
-                const statusCell = row.cells[0];
-                const statusSpan = statusCell.querySelector('.status-indicator');
+                const statusSpan = row.querySelector('.status-indicator');
                 
                 if (diffMinutes >= -30 && diffMinutes <= 30) {
+                    // Activa
                     row.classList.add('row-active');
                     statusSpan.className = 'status-indicator status-active';
                     statusSpan.textContent = '🔄 Activa';
                 } else if (diffMinutes > 30) {
+                    // Próxima
                     row.classList.add('row-upcoming');
                     statusSpan.className = 'status-indicator status-upcoming';
                     statusSpan.textContent = '⏰ Próxima';
                 } else {
+                    // Completada
                     row.classList.add('row-completed');
                     statusSpan.className = 'status-indicator status-completed';
                     statusSpan.textContent = '✅ Completada';
                 }
             });
-        });
+        }
 
         // Actualizar estados cada minuto
-        setInterval(function() {
-            document.dispatchEvent(new Event('DOMContentLoaded'));
-        }, 60000);
+        setInterval(updateStatus, 60000);
     </script>
 </body>
 </html>
