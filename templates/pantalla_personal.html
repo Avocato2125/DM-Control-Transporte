@@ -21,19 +21,7 @@
             min-height: 100vh;
             overflow-x: hidden;
         }
-.header-logo {
-    height: 80px;
-    max-width: 300px;
-    object-fit: contain;
-    filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.5));
-}
 
-@media (max-width: 768px) {
-    .header-logo {
-        height: 60px;
-        max-width: 250px;
-    }
-}
         /* Header */
         header {
             background: linear-gradient(90deg, #0066cc 0%, #004499 100%);
@@ -363,7 +351,7 @@
             font-weight: 600;
         }
 
-        /* Responsive Design */
+        /* Responsive Design Mejorado */
         @media (max-width: 1200px) {
             .route-group {
                 width: calc(25% - 12px);
@@ -371,25 +359,172 @@
         }
 
         @media (max-width: 768px) {
-            header h1 {
-                font-size: 2em;
+            /* Header móvil */
+            header {
+                padding: 15px 0;
             }
             
+            .header-logo {
+                height: 50px;
+                max-width: 200px;
+            }
+            
+            /* Info bar móvil */
             .current-info {
                 flex-direction: column;
-                gap: 10px;
+                gap: 8px;
+                padding: 10px;
             }
             
             .current-info span {
-                font-size: 1.3em;
+                font-size: 1.2em;
+                padding: 6px 12px;
+            }
+            
+            /* Main display móvil */
+            .main-display {
+                padding: 15px 10px;
+            }
+            
+            /* Container principal móvil */
+            .current-departure-container {
+                padding: 15px;
+                margin-bottom: 20px;
             }
             
             .current-departure-container h2 {
+                font-size: 1.6em;
+                margin-bottom: 15px;
+            }
+            
+            /* Rutas activas móvil */
+            .current-route-group {
+                min-width: 250px;
+                padding: 15px;
+            }
+            
+            .current-route-group h4 {
+                font-size: 1.3em;
+                padding: 8px;
+                margin-bottom: 10px;
+            }
+            
+            .current-time-list li strong {
+                font-size: 1.1em;
+                padding: 6px;
+            }
+            
+            .current-departure-item-card {
+                padding: 8px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            
+            .current-departure-item-card span {
+                font-size: 1em;
+                width: 100%;
+            }
+            
+            .current-departure-item-card span:last-child {
+                align-self: flex-end;
+                padding: 3px 8px;
+                font-size: 0.9em;
+            }
+            
+            /* Próximas salidas móvil */
+            .next-departures h3 {
                 font-size: 1.8em;
+                padding: 10px;
+                margin-bottom: 15px;
+            }
+            
+            .carousel-container {
+                height: 300px;
+            }
+            
+            .carousel-track {
+                padding: 10px;
+                gap: 10px;
             }
             
             .route-group {
-                width: calc(50% - 12px);
+                width: calc(50% - 8px);
+                padding: 12px;
+            }
+            
+            .route-group h4 {
+                font-size: 1.2em;
+                padding: 8px;
+                margin-bottom: 10px;
+            }
+            
+            .time-list li strong {
+                font-size: 1em;
+                padding: 4px;
+            }
+            
+            .route-item-card {
+                padding: 6px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 4px;
+            }
+            
+            .route-item-card span {
+                font-size: 0.9em;
+                width: 100%;
+            }
+            
+            .route-item-card span:last-child {
+                align-self: flex-end;
+                padding: 2px 6px;
+                font-size: 0.8em;
+            }
+            
+            /* Footer móvil */
+            footer {
+                padding: 10px 0;
+                font-size: 1em;
+            }
+        }
+
+        @media (max-width: 480px) {
+            /* Extra pequeño (teléfonos pequeños) */
+            .header-logo {
+                height: 40px;
+                max-width: 160px;
+            }
+            
+            .current-info span {
+                font-size: 1em;
+                padding: 5px 10px;
+            }
+            
+            .current-departure-container h2 {
+                font-size: 1.4em;
+            }
+            
+            .current-route-group {
+                min-width: 220px;
+                padding: 12px;
+            }
+            
+            .current-route-group h4 {
+                font-size: 1.2em;
+            }
+            
+            .next-departures h3 {
+                font-size: 1.5em;
+            }
+            
+            .carousel-container {
+                height: 250px;
+            }
+            
+            .route-group {
+                width: calc(100% - 8px);
+                min-width: 280px;
             }
         }
 
@@ -415,7 +550,7 @@
 </head>
 <body>
     <header>
-        <img src="{{ url_for('static', filename='IMG/dm_logo.png') }}" alt="DM CONTROL" class="header-logo">
+        <h1>DM CONTROL</h1>
     </header>
 
     <div class="current-info">
@@ -505,6 +640,7 @@
         let currentIndex = 0;
         let intervalId;
 
+        // --- Carrusel móvil optimizado ---
         function updateCarousel() {
             if (!carouselTrack || !carouselContainer || routeGroups.length === 0) {
                 clearInterval(intervalId);
@@ -512,9 +648,19 @@
                 return;
             }
 
-            const totalPages = Math.ceil(routeGroups.length / numRoutesPerPage);
+            // Ajustar número de elementos por página según el ancho de pantalla
+            let itemsPerPage = 5;
+            if (window.innerWidth <= 480) {
+                itemsPerPage = 1; // 1 elemento en pantallas muy pequeñas
+            } else if (window.innerWidth <= 768) {
+                itemsPerPage = 2; // 2 elementos en tablets/móviles
+            } else if (window.innerWidth <= 1200) {
+                itemsPerPage = 4; // 4 elementos en pantallas medianas
+            }
 
-            if (routeGroups.length > numRoutesPerPage) {
+            const totalPages = Math.ceil(routeGroups.length / itemsPerPage);
+
+            if (routeGroups.length > itemsPerPage) {
                 const visiblePageWidth = carouselContainer.offsetWidth;
                 const offset = -currentIndex * visiblePageWidth;
                 
@@ -531,7 +677,8 @@
             }
         }
 
-        if (routeGroups.length > numRoutesPerPage) {
+        // Ajustar carrusel para móviles
+        if (routeGroups.length > (window.innerWidth <= 768 ? 2 : 5)) {
              intervalId = setInterval(updateCarousel, 5000);
         }
        
