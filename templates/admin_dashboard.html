@@ -179,11 +179,11 @@
 
         {# Sección para mostrar mensajes flash (éxito/error) #}
         {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
+        {% if messages %}
             {% for category, message in messages %}
-              <div class="flash-message {{ category }}">{{ message }}</div>
+            <div class="flash-message {{ category }}">{{ message }}</div>
             {% endfor %}
-          {% endif %}
+        {% endif %}
         {% endwith %}
 
         <div class="actions">
