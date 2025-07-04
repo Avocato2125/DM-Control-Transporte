@@ -95,6 +95,52 @@
         th {
             background-color: #f2f2f2;
         }
+
+        /* NUEVOS ESTILOS PARA INDICADORES DE ESTADO */
+        .status-indicator {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        .status-completed {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-upcoming {
+            background-color: #cce5ff;
+            color: #004085;
+            border: 1px solid #99d6ff;
+        }
+        .status-active {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffecb5;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        /* Estilos para filas según el estado */
+        .row-completed {
+            background-color: #f8f9fa;
+            opacity: 0.8;
+        }
+        .row-active {
+            background-color: #fff9e6;
+            border-left: 4px solid #ffc107;
+        }
+        .row-upcoming {
+            background-color: #ffffff;
+        }
+
         .flash-message {
             padding: 10px;
             margin-bottom: 15px;
@@ -121,6 +167,25 @@
             padding: 5px 10px;
             font-size: 0.85em;
         }
+
+        /* Leyenda de estados */
+        .status-legend {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .status-legend h3 {
+            margin: 0 0 8px 0;
+            font-size: 1em;
+            color: #495057;
+        }
+        .legend-item {
+            display: inline-block;
+            margin-right: 15px;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
@@ -144,11 +209,26 @@
             </form>
         </div>
 
-        <h2>Asignaciones de Rutas y Camiones</h2>
+        <!-- Leyenda de estados -->
+        <div class="status-legend">
+            <h3>Estado de las Asignaciones:</h3>
+            <div class="legend-item">
+                <span class="status-indicator status-active">🔄 Activa</span> - En ventana de tiempo (30 min antes/después)
+            </div>
+            <div class="legend-item">
+                <span class="status-indicator status-upcoming">⏰ Próxima</span> - Programada para el futuro
+            </div>
+            <div class="legend-item">
+                <span class="status-indicator status-completed">✅ Completada</span> - Ya pasó su horario
+            </div>
+        </div>
+
+        <h2>Asignaciones de Rutas y Camiones (Historial Completo)</h2>
         {% if asignaciones %}
             <table>
                 <thead>
                     <tr>
+                        <th>Estado</th>
                         <th>Fecha</th>
                         <th>Hora Salida</th>
                         <th>Días Aplicables</th>
@@ -160,9 +240,30 @@
                 </thead>
                 <tbody>
                     {% for asignacion in asignaciones %}
-                    <tr>
+                    {% set now = moment() %}
+                    {% set asignacion_datetime = moment(asignacion.fecha + ' ' + asignacion.hora_salida) %}
+                    {% set diff_minutes = (asignacion_datetime.timestamp - now.timestamp) / 60 %}
+                    
+                    {% if diff_minutes >= -30 and diff_minutes <= 30 %}
+                        {% set status_class = "row-active" %}
+                        {% set status_indicator = "status-active" %}
+                        {% set status_text = "🔄 Activa" %}
+                    {% elif diff_minutes > 30 %}
+                        {% set status_class = "row-upcoming" %}
+                        {% set status_indicator = "status-upcoming" %}
+                        {% set status_text = "⏰ Próxima" %}
+                    {% else %}
+                        {% set status_class = "row-completed" %}
+                        {% set status_indicator = "status-completed" %}
+                        {% set status_text = "✅ Completada" %}
+                    {% endif %}
+
+                    <tr class="{{ status_class }}">
+                        <td>
+                            <span class="status-indicator {{ status_indicator }}">{{ status_text }}</span>
+                        </td>
                         <td>{{ asignacion.fecha }}</td>
-                        <td>{{ asignacion.hora_salida_12h if asignacion.hora_salida_12h else asignacion.hora_salida }}</td> {# Usar hora_salida_12h #}
+                        <td>{{ asignacion.hora_salida_12h if asignacion.hora_salida_12h else asignacion.hora_salida }}</td>
                         <td>{{ asignacion.dias_semana }}</td>
                         <td>{{ asignacion.nombre_ruta }}</td>
                         <td>{{ asignacion.recorrido }}</td>
@@ -191,5 +292,62 @@
             <p>No hay asignaciones programadas. ¡Crea una nueva!</p>
         {% endif %}
     </div>
+
+    <script>
+        // Script para calcular el estado en tiempo real sin depender de Jinja2
+        document.addEventListener('DOMContentLoaded', function() {
+            const rows = document.querySelectorAll('tbody tr');
+            
+            rows.forEach(function(row) {
+                const fechaCell = row.cells[1].textContent.trim();
+                const horaCell = row.cells[2].textContent.trim();
+                
+                // Convertir la hora de 12h a 24h si es necesario
+                let hora24 = horaCell;
+                if (horaCell.includes('AM') || horaCell.includes('PM')) {
+                    const [time, period] = horaCell.split(' ');
+                    let [hours, minutes] = time.split(':');
+                    hours = parseInt(hours);
+                    
+                    if (period === 'PM' && hours !== 12) {
+                        hours += 12;
+                    } else if (period === 'AM' && hours === 12) {
+                        hours = 0;
+                    }
+                    
+                    hora24 = `${hours.toString().padStart(2, '0')}:${minutes}`;
+                }
+                
+                const asignacionDateTime = new Date(`${fechaCell} ${hora24}`);
+                const now = new Date();
+                const diffMinutes = (asignacionDateTime.getTime() - now.getTime()) / (1000 * 60);
+                
+                // Limpiar clases existentes
+                row.classList.remove('row-active', 'row-upcoming', 'row-completed');
+                
+                const statusCell = row.cells[0];
+                const statusSpan = statusCell.querySelector('.status-indicator');
+                
+                if (diffMinutes >= -30 && diffMinutes <= 30) {
+                    row.classList.add('row-active');
+                    statusSpan.className = 'status-indicator status-active';
+                    statusSpan.textContent = '🔄 Activa';
+                } else if (diffMinutes > 30) {
+                    row.classList.add('row-upcoming');
+                    statusSpan.className = 'status-indicator status-upcoming';
+                    statusSpan.textContent = '⏰ Próxima';
+                } else {
+                    row.classList.add('row-completed');
+                    statusSpan.className = 'status-indicator status-completed';
+                    statusSpan.textContent = '✅ Completada';
+                }
+            });
+        });
+
+        // Actualizar estados cada minuto
+        setInterval(function() {
+            document.dispatchEvent(new Event('DOMContentLoaded'));
+        }, 60000);
+    </script>
 </body>
 </html>

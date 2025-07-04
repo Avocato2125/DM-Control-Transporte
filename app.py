@@ -27,7 +27,7 @@ MONTERREY_TZ = pytz.timezone('America/Monterrey')
 
 DATABASE_URL = os.environ.get('DATABASE_URL') 
 
-# ===== AGREGAR LÍNEAS DE DEBUG =====
+# ===== LÍNEAS DE DEBUG (OPCIONAL - PUEDES ELIMINARLAS) =====
 print("🔍 DEBUG - Iniciando aplicación")
 print(f"DATABASE_URL configurada: {bool(DATABASE_URL)}")
 
@@ -110,12 +110,13 @@ def get_db_connection():
 @app.route('/')
 def admin_dashboard():
     conn = None 
-    cursor = None # Inicializar cursor
+    cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor() 
 
-        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchall()
+        # MODIFICADO: Mostrar TODAS las asignaciones (sin filtro de fecha)
+        # Orden: más recientes primero
         cursor.execute('''
             SELECT
                 A.id_asignacion,
@@ -130,10 +131,9 @@ def admin_dashboard():
             FROM asignaciones AS A
             JOIN horariossalida AS HS ON A.id_horario = HS.id_horario
             JOIN rutas AS R ON A.id_ruta = R.id_ruta
-            WHERE A.fecha >= %s 
-            ORDER BY A.fecha, HS.hora_salida
-        ''', (datetime.date.today().strftime('%Y-%m-%d'),))
-        asignaciones_raw = cursor.fetchall() # <-- Llamada separada
+            ORDER BY A.fecha DESC, HS.hora_salida DESC
+        ''')
+        asignaciones_raw = cursor.fetchall()
 
         conn.close() 
 
@@ -169,9 +169,8 @@ def nueva_asignacion():
         order_case += "ELSE 99 END"
         query_rutas_ordered = f'SELECT id_ruta, nombre, recorrido FROM rutas ORDER BY {order_case}, nombre'
         
-        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchall()
         cursor.execute(query_rutas_ordered)
-        rutas = cursor.fetchall() # <-- Llamada separada
+        rutas = cursor.fetchall()
         
     except Exception as e:
         logger.error(f"Error al cargar formulario de nueva asignación (GET): {e}", exc_info=True)
@@ -202,22 +201,21 @@ def nueva_asignacion():
                 conn = get_db_connection()
                 cursor = conn.cursor() 
 
-                # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchone()
                 cursor.execute("SELECT id_horario FROM horariossalida WHERE hora_salida = %s", (hora_salida_24h,))
-                horario_db = cursor.fetchone() # <-- Llamada separada
+                horario_db = cursor.fetchone()
 
                 id_horario = None
                 if horario_db:
-                    id_horario = horario_db['id_horario'] # Ahora es un diccionario
+                    id_horario = horario_db['id_horario']
                 else:
                     cursor.execute("INSERT INTO horariossalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
-                                   (hora_salida_24h, "Todos", False)) 
+                                (hora_salida_24h, "Todos", False)) 
                     conn.commit()
-                    id_horario = cursor.fetchone()['id_horario'] # <-- Llamada separada (obtener de diccionario)
+                    id_horario = cursor.fetchone()['id_horario']
 
                 if id_horario:
                     cursor.execute('INSERT INTO asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
-                                 (id_horario, id_ruta_val, numero_camion_manual, fecha)) 
+                                (id_horario, id_ruta_val, numero_camion_manual, fecha)) 
                     conn.commit()
                     flash('Asignación creada exitosamente.', 'success')
                     return redirect(url_for('admin_dashboard'))
@@ -287,9 +285,8 @@ def editar_asignacion(id_asignacion):
     try:
         conn = get_db_connection()
         cursor = conn.cursor() 
-        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchone()
         cursor.execute('SELECT A.*, HS.hora_salida FROM asignaciones AS A JOIN horariossalida AS HS ON A.id_horario = HS.id_horario WHERE A.id_asignacion = %s', (id_asignacion,))
-        asignacion_base = cursor.fetchone() # <-- Llamada separada
+        asignacion_base = cursor.fetchone()
         
         if asignacion_base is None:
             flash('Asignación no encontrada.', 'error')
@@ -309,9 +306,8 @@ def editar_asignacion(id_asignacion):
         order_case += "ELSE 99 END"
         query_rutas_ordered = f'SELECT id_ruta, nombre, recorrido FROM rutas ORDER BY {order_case}, nombre'
         
-        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchall()
         cursor.execute(query_rutas_ordered)
-        rutas = cursor.fetchall() # <-- Llamada separada
+        rutas = cursor.fetchall()
         
     except Exception as e:
         logger.error(f"Error al cargar asignación para editar (GET): {e}", exc_info=True)
@@ -338,18 +334,17 @@ def editar_asignacion(id_asignacion):
                 conn = get_db_connection()
                 cursor = conn.cursor() 
                 
-                # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchone()
                 cursor.execute("SELECT id_horario FROM horariossalida WHERE hora_salida = %s", (hora_salida_24h,))
-                horario_db = cursor.fetchone() # <-- Llamada separada
+                horario_db = cursor.fetchone()
 
                 id_horario_nuevo = None
                 if horario_db:
-                    id_horario_nuevo = horario_db['id_horario'] # Ahora es un diccionario
+                    id_horario_nuevo = horario_db['id_horario']
                 else:
                     cursor.execute("INSERT INTO horariossalida (hora_salida, dias_semana, es_especial) VALUES (%s, %s, %s) RETURNING id_horario", 
-                                   (hora_salida_24h, "Todos", False)) 
+                                (hora_salida_24h, "Todos", False)) 
                     conn.commit()
-                    id_horario_nuevo = cursor.fetchone()['id_horario'] # <-- Llamada separada (obtener de diccionario)
+                    id_horario_nuevo = cursor.fetchone()['id_horario']
 
                 if id_horario_nuevo:
                     cursor.execute('''
@@ -372,19 +367,18 @@ def editar_asignacion(id_asignacion):
                 if conn: conn.close()
     
     return render_template('editar_asignacion.html', 
-                           asignacion=asignacion, 
-                           rutas=rutas, 
-                           asignacion_hora_12h=asignacion['hora_salida_12h'])
+                        asignacion=asignacion, 
+                        rutas=rutas, 
+                        asignacion_hora_12h=asignacion['hora_salida_12h'])
 
 @app.route('/copiar_asignacion/<int:id_asignacion>', methods=('POST',))
 def copiar_asignacion(id_asignacion):
     conn = None 
     try:
         conn = get_db_connection()
-        cursor = conn.cursor() # Cursor para SELECT
-        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchone()
+        cursor = conn.cursor()
         cursor.execute('SELECT * FROM asignaciones WHERE id_asignacion = %s', (id_asignacion,))
-        asignacion_original = cursor.fetchone() # <-- Llamada separada
+        asignacion_original = cursor.fetchone()
         
         if asignacion_original is None:
             flash('Asignación original no encontrada para copiar.', 'error')
@@ -393,7 +387,7 @@ def copiar_asignacion(id_asignacion):
 
         cursor_insert = conn.cursor() 
         cursor_insert.execute('INSERT INTO asignaciones (id_horario, id_ruta, numero_camion_manual, fecha) VALUES (%s, %s, %s, %s)',
-                     (asignacion_original['id_horario'], asignacion_original['id_ruta'], asignacion_original['numero_camion_manual'], asignacion_original['fecha']))
+                    (asignacion_original['id_horario'], asignacion_original['id_ruta'], asignacion_original['numero_camion_manual'], asignacion_original['fecha']))
         conn.commit()
         flash('Asignación copiada exitosamente. Puedes editarla si necesitas cambiar la fecha/hora.', 'success')
     except Exception as e:
@@ -401,8 +395,8 @@ def copiar_asignacion(id_asignacion):
         logger.error(f"Error al copiar asignación: {e}", exc_info=True)
         flash(f'Error al copiar asignación: {e}', 'error')
     finally:
-        if 'cursor' in locals() and cursor: cursor.close() # Cierra el primer cursor
-        if 'cursor_insert' in locals() and cursor_insert: cursor_insert.close() # Cierra el segundo cursor si existió
+        if 'cursor' in locals() and cursor: cursor.close()
+        if 'cursor_insert' in locals() and cursor_insert: cursor_insert.close()
         if conn: 
             conn.close()
     return redirect(url_for('admin_dashboard'))
@@ -421,7 +415,7 @@ def pantalla_personal():
         hoy_str = now.strftime('%Y-%m-%d')
         hora_actual_dt = now.time()
         
-        # ¡CORRECCIÓN CLAVE AQUÍ! Separar execute() y fetchall()
+        # PANTALLA PERSONAL: Mantiene la lógica original (solo futuras)
         cursor.execute('''
             SELECT
                 HS.hora_salida,
@@ -437,7 +431,7 @@ def pantalla_personal():
             WHERE A.fecha >= %s
             ORDER BY A.fecha ASC, HS.hora_salida ASC
         ''', (hoy_str,))
-        all_relevant_departures_raw = cursor.fetchall() # <-- Llamada separada
+        all_relevant_departures_raw = cursor.fetchall()
 
         all_relevant_departures = []
         for row in all_relevant_departures_raw:
@@ -489,8 +483,8 @@ def pantalla_personal():
         salidas_ahora_agrupadas_por_ruta = defaultdict(lambda: defaultdict(list))
         if hora_activa_para_display_24h and fecha_activa_para_display:
             salidas_ahora_raw = [s for s in all_relevant_departures if 
-                             s['fecha'] == fecha_activa_para_display and 
-                             s['hora_salida'] == hora_activa_para_display_24h]
+                            s['fecha'] == fecha_activa_para_display and 
+                            s['hora_salida'] == hora_activa_para_display_24h]
             
             for salida in salidas_ahora_raw:
                 ruta_nombre = salida['nombre_ruta']
@@ -564,14 +558,13 @@ def pantalla_personal():
         display_fecha_actual = now.strftime('%d/%m/%Y')
 
         return render_template('pantalla_personal.html', 
-                               salidas_ahora_agrupadas_por_ruta=salidas_ahora_para_plantilla, 
-                               hora_activa_para_display_12h=convert_to_12h(hora_activa_para_display_24h) if hora_activa_para_display_24h else None, 
-                               fecha_activa_para_display=fecha_activa_para_display, 
-                               proximas_salidas_agrupadas_por_ruta=proximas_salidas_para_plantilla, 
-                               hora_actual=display_hora_actual, 
-                               fecha_actual=display_fecha_actual)
+                            salidas_ahora_agrupadas_por_ruta=salidas_ahora_para_plantilla, 
+                            hora_activa_para_display_12h=convert_to_12h(hora_activa_para_display_24h) if hora_activa_para_display_24h else None, 
+                            fecha_activa_para_display=fecha_activa_para_display, 
+                            proximas_salidas_agrupadas_por_ruta=proximas_salidas_para_plantilla, 
+                            hora_actual=display_hora_actual, 
+                            fecha_actual=display_fecha_actual)
     except Exception as e:
-        # Se cierra la conexión a la DB en caso de error si llegó a abrirse
         if 'conn' in locals() and conn:
             conn.close()
         logger.error(f"Error al cargar pantalla_personal: {e}", exc_info=True)
