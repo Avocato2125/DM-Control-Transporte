@@ -132,11 +132,10 @@
 
         .current-routes-track {
             display: flex;
-            transition: transform 0.5s ease;
             gap: 20px;
         }
 
-        /* Current Route Groups */
+        /* Current Route Groups - SIN TRIÁNGULO */
         .current-route-group {
             background: linear-gradient(145deg, #000000 0%, #1a1a1a 100%);
             border-radius: 15px;
@@ -148,16 +147,7 @@
             position: relative;
         }
 
-        .current-route-group::after {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 40px;
-            height: 40px;
-            background: #0066cc;
-            clip-path: polygon(100% 0, 0 0, 100% 100%);
-        }
+        /* ELIMINADO: .current-route-group::after (triángulo azul) */
 
         .current-route-group h4 {
             font-size: 1.6em;
@@ -520,56 +510,64 @@
        
         updateCarousel(); 
 
-        // --- Carrusel de Salidas Programadas Ahora (superior) ---
+        // --- Scroll infinito suave para salidas activas ---
         const currentDepartureTrack = document.getElementById('currentDepartureTrack');
-        const currentRouteGroups = currentDepartureTrack ? currentDepartureTrack.querySelectorAll('.current-route-group') : [];
         let currentPosition = 0;
-        const scrollSpeed = 1;
+        const scrollSpeed = 0.5;
         let currentAnimationId;
 
-        function animateContinuousScroll() {
-            if (!currentDepartureTrack || currentRouteGroups.length === 0) {
-                if (currentAnimationId) cancelAnimationFrame(currentAnimationId);
-                currentAnimationId = null;
-                return;
-            }
+        function setupInfiniteScroll() {
+            if (!currentDepartureTrack) return;
 
-            const totalScrollWidth = currentDepartureTrack.scrollWidth;
-            const visibleWidth = currentDepartureTrack.offsetWidth;
+            const originalGroups = currentDepartureTrack.querySelectorAll('.current-route-group');
+            if (originalGroups.length === 0) return;
 
-            if (totalScrollWidth <= visibleWidth) {
-                currentDepartureTrack.style.transform = `translateX(0px)`;
-                if (currentAnimationId) cancelAnimationFrame(currentAnimationId);
-                currentAnimationId = null;
-                return;
-            }
+            // Duplicar el contenido para crear el efecto infinito
+            const clonedGroups = [];
+            originalGroups.forEach(group => {
+                const clone = group.cloneNode(true);
+                clonedGroups.push(clone);
+                currentDepartureTrack.appendChild(clone);
+            });
 
-            currentPosition -= scrollSpeed;
+            // Calcular el ancho del contenido original
+            const originalWidth = Array.from(originalGroups).reduce((total, group) => {
+                return total + group.offsetWidth + 20; // 20px es el gap
+            }, 0);
 
-            if (Math.abs(currentPosition) >= totalScrollWidth) {
-                currentPosition = 0;
-            }
-            
-            currentDepartureTrack.style.transform = `translateX(${currentPosition}px)`;
-            currentAnimationId = requestAnimationFrame(animateContinuousScroll);
-        }
-
-        function startContinuousScroll() {
-            if (currentAnimationId) cancelAnimationFrame(currentAnimationId);
-
-            setTimeout(() => {
-                const totalScrollWidth = currentDepartureTrack.scrollWidth;
-                const visibleWidth = currentDepartureTrack.offsetWidth;
-                if (totalScrollWidth > visibleWidth) {
-                    currentPosition = 0;
-                    animateContinuousScroll();
-                } else {
-                    currentDepartureTrack.style.transform = `translateX(0px)`;
+            function animateInfiniteScroll() {
+                if (!currentDepartureTrack) {
+                    if (currentAnimationId) cancelAnimationFrame(currentAnimationId);
+                    return;
                 }
-            }, 500);
+
+                const containerWidth = currentDepartureTrack.parentElement.offsetWidth;
+                
+                // Solo animar si el contenido es más ancho que el contenedor
+                if (originalWidth <= containerWidth) {
+                    currentDepartureTrack.style.transform = `translateX(0px)`;
+                    if (currentAnimationId) cancelAnimationFrame(currentAnimationId);
+                    return;
+                }
+
+                currentPosition -= scrollSpeed;
+
+                // Cuando hemos movido exactamente el ancho del contenido original,
+                // reiniciamos sin salto visible (porque tenemos contenido duplicado)
+                if (Math.abs(currentPosition) >= originalWidth) {
+                    currentPosition = 0;
+                }
+
+                currentDepartureTrack.style.transform = `translateX(${currentPosition}px)`;
+                currentAnimationId = requestAnimationFrame(animateInfiniteScroll);
+            }
+
+            // Iniciar la animación
+            animateInfiniteScroll();
         }
 
-        startContinuousScroll();
+        // Inicializar después de que el DOM esté listo
+        setTimeout(setupInfiniteScroll, 1000);
 
         // --- Manejo de redimensionamiento de ventana ---
         window.addEventListener('resize', () => {
@@ -581,7 +579,7 @@
                 intervalId = setInterval(updateCarousel, 5000);
             }
 
-            startContinuousScroll();
+            setupInfiniteScroll();
         });
     </script>
 </body>
