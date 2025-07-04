@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DM CONTROL - Salidas de Personal</title>
-    <meta http-equiv="refresh" content="10"> 
+    <meta http-equiv="refresh" content="15"> 
     <style>
         * {
             margin: 0;
@@ -20,6 +20,14 @@
             flex-direction: column;
             min-height: 100vh;
             overflow-x: hidden;
+        }
+
+        /* Logo styles */
+        .header-logo {
+            height: 80px;
+            max-width: 300px;
+            object-fit: contain;
+            filter: drop-shadow(2px 2px 4px rgba(0, 0, 0, 0.5));
         }
 
         /* Header */
@@ -550,7 +558,7 @@
 </head>
 <body>
     <header>
-        <h1>DM CONTROL</h1>
+        <img src="{{ url_for('static', filename='IMG/dm_logo.png') }}" alt="DM CONTROL" class="header-logo">
     </header>
 
     <div class="current-info">
@@ -628,7 +636,7 @@
     </div>
 
     <footer>
-        🔄 Actualizado automáticamente cada 10 segundos
+        🔄 Actualizado automáticamente cada 15 segundos
     </footer>
 
     <script>
@@ -636,7 +644,6 @@
         const carouselTrack = document.getElementById('carouselTrack');
         const carouselContainer = carouselTrack ? carouselTrack.parentElement : null;
         const routeGroups = carouselTrack ? carouselTrack.querySelectorAll('.route-group') : [];
-        const numRoutesPerPage = 5;
         let currentIndex = 0;
         let intervalId;
 
@@ -712,15 +719,16 @@
 
         // --- Manejo de redimensionamiento de ventana ---
         window.addEventListener('resize', () => {
+            // Reiniciar carrusel
             clearInterval(intervalId);
             intervalId = null;
             currentIndex = 0;
             updateCarousel();
-            if (routeGroups.length > numRoutesPerPage) {
+            if (routeGroups.length > (window.innerWidth <= 768 ? 2 : 5)) {
                 intervalId = setInterval(updateCarousel, 5000);
             }
 
-            startSimpleContinuousScroll();
+            // Reiniciar scroll CSS
             setupCSSScroll();
         });
     </script>
