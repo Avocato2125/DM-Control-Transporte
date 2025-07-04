@@ -130,9 +130,26 @@
             border-radius: 15px;
         }
 
+        /* Animación CSS para scroll continuo */
+        @keyframes scroll-left {
+            0% {
+                transform: translateX(0);
+            }
+            100% {
+                transform: translateX(-100%);
+            }
+        }
+
         .current-routes-track {
             display: flex;
             gap: 20px;
+            animation: scroll-left 30s linear infinite;
+            width: max-content;
+        }
+
+        /* Pausar animación al hacer hover */
+        .current-departure-routes-wrapper:hover .current-routes-track {
+            animation-play-state: paused;
         }
 
         /* Current Route Groups - SIN TRIÁNGULO */
@@ -508,71 +525,31 @@
        
         updateCarousel(); 
 
-        // --- Scroll continuo simple (solo cuando hay 4+ elementos) ---
+        // --- Scroll CSS automático (sin JavaScript complejo) ---
         const currentDepartureTrack = document.getElementById('currentDepartureTrack');
-        let currentPosition = 0;
-        const scrollSpeed = 1;
-        let currentAnimationId;
-        const MIN_ELEMENTS = 4; // Mínimo de elementos para activar scroll
+        const MIN_ELEMENTS = 4;
 
-        function startSimpleContinuousScroll() {
+        function setupCSSScroll() {
             if (!currentDepartureTrack) return;
 
             const routeGroups = currentDepartureTrack.querySelectorAll('.current-route-group');
             
-            // Solo activar scroll si hay 4 o más elementos
-            if (routeGroups.length < MIN_ELEMENTS) {
-                // Si hay pocos elementos, mantener estático
-                currentDepartureTrack.style.transform = 'translateX(0px)';
-                if (currentAnimationId) {
-                    cancelAnimationFrame(currentAnimationId);
-                    currentAnimationId = null;
-                }
-                return;
-            }
-
-            // Calcular ancho total del contenido
-            const containerWidth = currentDepartureTrack.parentElement.offsetWidth;
-            const totalWidth = currentDepartureTrack.scrollWidth;
-
-            // Solo hacer scroll si el contenido es más ancho que el contenedor
-            if (totalWidth <= containerWidth) {
-                currentDepartureTrack.style.transform = 'translateX(0px)';
-                return;
-            }
-
-            function animate() {
-                if (!currentDepartureTrack) {
-                    if (currentAnimationId) {
-                        cancelAnimationFrame(currentAnimationId);
-                        currentAnimationId = null;
-                    }
-                    return;
-                }
-
-                // Mover hacia la izquierda continuamente
-                currentPosition -= scrollSpeed;
-
-                // Cuando llega al final, reiniciar desde el principio
-                const maxScroll = totalWidth - containerWidth;
-                if (Math.abs(currentPosition) >= maxScroll) {
-                    currentPosition = 0; // Reinicio simple
-                }
-
-                // Aplicar transformación
-                currentDepartureTrack.style.transform = `translateX(${currentPosition}px)`;
+            // Solo activar animación si hay 4+ elementos
+            if (routeGroups.length >= MIN_ELEMENTS) {
+                // Duplicar contenido para scroll infinito
+                const originalContent = currentDepartureTrack.innerHTML;
+                currentDepartureTrack.innerHTML = originalContent + originalContent;
                 
-                // Continuar animación
-                currentAnimationId = requestAnimationFrame(animate);
+                // Aplicar animación CSS
+                currentDepartureTrack.style.animation = 'scroll-left 30s linear infinite';
+            } else {
+                // Sin animación para pocos elementos
+                currentDepartureTrack.style.animation = 'none';
             }
-
-            // Iniciar animación
-            currentPosition = 0;
-            animate();
         }
 
-        // Inicializar después de que el DOM esté listo
-        setTimeout(startSimpleContinuousScroll, 1000);
+        // Inicializar
+        setTimeout(setupCSSScroll, 1000);
 
         // --- Manejo de redimensionamiento de ventana ---
         window.addEventListener('resize', () => {
@@ -585,6 +562,7 @@
             }
 
             startSimpleContinuousScroll();
+            setupCSSScroll();
         });
     </script>
 </body>
