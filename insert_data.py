@@ -16,6 +16,36 @@ def get_db_connection():
     conn.autocommit = False
     return conn
 
+def limpiar_rutas():
+    """
+    Elimina todas las rutas existentes para poder insertar las nuevas
+    """
+    print("🧹 Limpiando rutas existentes...")
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Primero eliminar asignaciones que dependen de rutas
+        cursor.execute("DELETE FROM asignaciones")
+        print("🗑️ Asignaciones eliminadas")
+        
+        # Luego eliminar rutas
+        cursor.execute("DELETE FROM rutas")
+        print("🗑️ Rutas eliminadas")
+        
+        conn.commit()
+        print("✅ Limpieza completada")
+        
+    except Exception as e:
+        print(f"❌ ERROR al limpiar: {e}")
+        if conn:
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
+
 def insertar_rutas():
     """
     Inserta las rutas en la base de datos PostgreSQL.
@@ -64,12 +94,9 @@ def insertar_rutas():
 
         rutas_insertadas = 0
         for ruta in rutas:
-            cursor.execute("SELECT id_ruta FROM rutas WHERE nombre = %s AND recorrido = %s", ruta)
-            existe = cursor.fetchone()
-            if not existe:
-                cursor.execute("INSERT INTO rutas (nombre, recorrido) VALUES (%s, %s)", ruta)
-                rutas_insertadas += 1
-                print(f"✓ Ruta '{ruta[0]} - {ruta[1]}' insertada")
+            cursor.execute("INSERT INTO rutas (nombre, recorrido) VALUES (%s, %s)", ruta)
+            rutas_insertadas += 1
+            print(f"✓ Ruta '{ruta[0]} - {ruta[1]}' insertada")
 
         conn.commit()
         print(f"🎉 {rutas_insertadas} rutas insertadas exitosamente")
@@ -83,6 +110,7 @@ def insertar_rutas():
             conn.close()
 
 if __name__ == "__main__":
-    print("📋 Ejecutando inserción de datos...")
+    print("📋 Ejecutando actualización de rutas...")
+    limpiar_rutas()
     insertar_rutas()
     print("✅ Proceso completado")
