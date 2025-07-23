@@ -86,6 +86,7 @@ def insertar_rutas():
         ("MUZQUIZ", "SAN JUAN"),
         ("MUZQUIZ", "SANTA MARIA"),
         ("MUZQUIZ", "MUZQUIZ"), 
+        ("MUZQUIZ", "FUJIKURA"), 
         ("MANANTIALES", "VILLA UNION - LA LUZ - AMAPOLA"),
         ("MANANTIALES", "NAVA - RIO BRAVO"),
         ("MANANTIALES", "ZARAGOZA - MORELOS - ALAMOS"),
