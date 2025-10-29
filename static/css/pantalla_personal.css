@@ -263,7 +263,7 @@
         .route-group {
             flex-shrink: 0;
             width: calc(20% - 12px);
-            background: linear-gradient(145deg, #ffffff 0%, #f0f0f0 100%);
+            background: linear-gradient(145deg, #000000 0%, #f0f0f0 100%);
             border-radius: 15px;
             padding: 20px;
             border: 2px solid #000000;
@@ -306,7 +306,7 @@
         .time-list li strong {
             display: block;
             font-size: 1.2em;
-            color: #0066cc;
+            color: #ffffff;
             text-align: center;
             margin-bottom: 8px;
             font-weight: 700;
