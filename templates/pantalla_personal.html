@@ -6,7 +6,41 @@
     <title>DM CONTROL - Salidas de Personal</title>
     <meta http-equiv="refresh" content="15"> 
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pantalla_personal.css') }}">
-</head>
+
+    <style>
+        /* 1. Prepara los contenedores para el scroll */
+        .current-departure-routes-wrapper, 
+        .carousel-container {
+            overflow-x: auto;   /* Muestra el scroll H-horizontal SÓLO si es necesario */
+            overflow-y: hidden; /* Oculta el scroll vertical */
+            
+            /* Opcional: Mejora el scroll en pantallas táctiles (móviles/tablets) */
+            -webkit-overflow-scrolling: touch; 
+        }
+
+        /* 2. Resetea los "tracks" que se movían */
+        #currentDepartureTrack, 
+        #carouselTrack {
+            /* Detiene cualquier animación CSS o transformación JS que haya quedado */
+            transform: none !important; 
+            animation: none !important;
+            
+            /* Asegura que los items se queden en una sola línea horizontal */
+            display: flex;
+            flex-wrap: nowrap; /* MUY IMPORTANTE: impide que los items salten de línea */
+            
+            /* Deja que el track crezca con su contenido */
+            width: auto; 
+            position: static; /* Resetea cualquier posicionamiento extraño */
+        }
+
+        /* 3. Impide que los items se "aplasten" o encojan */
+        #currentDepartureTrack .current-route-group, 
+        #carouselTrack .route-group {
+            flex-shrink: 0; 
+        }
+    </style>
+    </head>
 <body>
     <header>
         <img src="{{ url_for('static', filename='IMG/dm_logo.png') }}" alt="DM CONTROL" class="header-logo">
@@ -20,37 +54,37 @@
     <div class="main-display">
         <div class="current-departure-container">
                 {% if hora_activa_para_display_12h and fecha_activa_para_display %}
-                <h2>Salidas Activas ({{ hora_activa_para_display_12h }} - {{ fecha_activa_para_display }})</h2>
-            {% else %}
-                <h2>Salidas Programadas Ahora</h2>
-            {% endif %}
+                    <h2>Salidas Activas ({{ hora_activa_para_display_12h }} - {{ fecha_activa_para_display }})</h2>
+                {% else %}
+                    <h2>Salidas Programadas Ahora</h2>
+                {% endif %}
 
-            {% if salidas_ahora_agrupadas_por_ruta %}
-                <div class="current-departure-routes-wrapper">
-                    <div class="current-routes-track" id="currentDepartureTrack">
-                        {% for ruta_grupo_ahora in salidas_ahora_agrupadas_por_ruta %}
-                            <div class="current-route-group">
-                                <h4>{{ ruta_grupo_ahora.nombre_ruta }}</h4>
-                                <ul class="current-time-list">
-                                    {% for fecha_hora_grupo_ahora in ruta_grupo_ahora.grupos_por_fecha_hora %}
-                                        <li>
-                                            <strong>{{ fecha_hora_grupo_ahora.fecha }} - {{ fecha_hora_grupo_ahora.hora }}</strong>
-                                            {% for salida in fecha_hora_grupo_ahora.salidas %}
-                                                <div class="current-departure-item-card">
-                                                    <span>{{ salida.recorrido }}</span>
-                                                    <span>{{ salida.numero_camion_manual if salida.numero_camion_manual else 'Pendiente' }}</span>
-                                                </div>
-                                            {% endfor %}
-                                        </li>
-                                    {% endfor %}
-                                </ul>
-                            </div>
-                        {% endfor %}
+                {% if salidas_ahora_agrupadas_por_ruta %}
+                    <div class="current-departure-routes-wrapper">
+                        <div class="current-routes-track" id="currentDepartureTrack">
+                            {% for ruta_grupo_ahora in salidas_ahora_agrupadas_por_ruta %}
+                                <div class="current-route-group">
+                                    <h4>{{ ruta_grupo_ahora.nombre_ruta }}</h4>
+                                    <ul class="current-time-list">
+                                        {% for fecha_hora_grupo_ahora in ruta_grupo_ahora.grupos_por_fecha_hora %}
+                                            <li>
+                                                <strong>{{ fecha_hora_grupo_ahora.fecha }} - {{ fecha_hora_grupo_ahora.hora }}</strong>
+                                                {% for salida in fecha_hora_grupo_ahora.salidas %}
+                                                    <div class="current-departure-item-card">
+                                                        <span>{{ salida.recorrido }}</span>
+                                                        <span>{{ salida.numero_camion_manual if salida.numero_camion_manual else 'Pendiente' }}</span>
+                                                    </div>
+                                                {% endfor %}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
-                </div>
-            {% else %}
-                <p class="no-salida">No hay salidas activas en este momento</p>
-            {% endif %}
+                {% else %}
+                    <p class="no-salida">No hay salidas activas en este momento</p>
+                {% endif %}
         </div>
 
         <div class="next-departures">
@@ -91,97 +125,9 @@
     </footer>
 
     <script>
-        // --- Carrusel de Próximas Salidas (inferior) ---
-        const carouselTrack = document.getElementById('carouselTrack');
-        const carouselContainer = carouselTrack ? carouselTrack.parentElement : null;
-        const routeGroups = carouselTrack ? carouselTrack.querySelectorAll('.route-group') : [];
-        let currentIndex = 0;
-        let intervalId;
-
-        // --- Carrusel móvil optimizado ---
-        function updateCarousel() {
-            if (!carouselTrack || !carouselContainer || routeGroups.length === 0) {
-                clearInterval(intervalId);
-                intervalId = null;
-                return;
-            }
-
-            // Ajustar número de elementos por página según el ancho de pantalla
-            let itemsPerPage = 5;
-            if (window.innerWidth <= 480) {
-                itemsPerPage = 1; // 1 elemento en pantallas muy pequeñas
-            } else if (window.innerWidth <= 768) {
-                itemsPerPage = 2; // 2 elementos en tablets/móviles
-            } else if (window.innerWidth <= 1200) {
-                itemsPerPage = 4; // 4 elementos en pantallas medianas
-            }
-
-            const totalPages = Math.ceil(routeGroups.length / itemsPerPage);
-
-            if (routeGroups.length > itemsPerPage) {
-                const visiblePageWidth = carouselContainer.offsetWidth;
-                const offset = -currentIndex * visiblePageWidth;
-                
-                carouselTrack.style.transform = `translateX(${offset}px)`;
-
-                currentIndex++;
-                if (currentIndex >= totalPages) {
-                    currentIndex = 0;
-                }
-            } else {
-                carouselTrack.style.transform = `translateX(0)`;
-                clearInterval(intervalId);
-                intervalId = null;
-            }
-        }
-
-        // Ajustar carrusel para móviles
-        if (routeGroups.length > (window.innerWidth <= 768 ? 2 : 5)) {
-            intervalId = setInterval(updateCarousel, 5000);
-        }
-
-        updateCarousel(); 
-
-        // --- Scroll CSS automático  ---
-        const currentDepartureTrack = document.getElementById('currentDepartureTrack');
-        const MIN_ELEMENTS = 4;
-
-        function setupCSSScroll() {
-            if (!currentDepartureTrack) return;
-
-            const routeGroups = currentDepartureTrack.querySelectorAll('.current-route-group');
-            
-            // Solo activar animación si hay 4+ elementos
-            if (routeGroups.length >= MIN_ELEMENTS) {
-                // Duplicar contenido para scroll infinito
-                const originalContent = currentDepartureTrack.innerHTML;
-                currentDepartureTrack.innerHTML = originalContent + originalContent;
-                
-                // Aplicar animación CSS
-                currentDepartureTrack.style.animation = 'scroll-left 30s linear infinite';
-            } else {
-                // Sin animación para pocos elementos
-                currentDepartureTrack.style.animation = 'none';
-            }
-        }
-
-        // Inicializar
-        setTimeout(setupCSSScroll, 1000);
-
-        // --- Manejo de redimensionamiento de ventana ---
-        window.addEventListener('resize', () => {
-            // Reiniciar carrusel
-            clearInterval(intervalId);
-            intervalId = null;
-            currentIndex = 0;
-            updateCarousel();
-            if (routeGroups.length > (window.innerWidth <= 768 ? 2 : 5)) {
-                intervalId = setInterval(updateCarousel, 5000);
-            }
-
-            // Reiniciar scroll CSS
-            setupCSSScroll();
-        });
+        /* * El JavaScript del carrusel automático ha sido eliminado 
+         * para dejar el contenido fijo y con scroll horizontal (manejado por CSS).
+         */
     </script>
 </body>
 </html>
