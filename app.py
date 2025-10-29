@@ -28,14 +28,14 @@ MONTERREY_TZ = pytz.timezone('America/Monterrey')
 DATABASE_URL = os.environ.get('DATABASE_URL') 
 
 # ===== LÍNEAS DE DEBUG (OPCIONAL - PUEDES ELIMINARLAS) =====
-print("🔍 DEBUG - Iniciando aplicación")
+print("DEBUG - Iniciando aplicación")
 print(f"DATABASE_URL configurada: {bool(DATABASE_URL)}")
 
 try:
     # Función temporal para verificar rutas
     def verificar_rutas_debug():
         if not DATABASE_URL:
-            print("❌ DATABASE_URL no configurada")
+            print("DATABASE_URL no configurada")
             return
         
         conn = psycopg2.connect(DATABASE_URL)
@@ -45,23 +45,23 @@ try:
         # Verificar rutas
         cursor.execute("SELECT COUNT(*) as count FROM rutas")
         rutas_count = cursor.fetchone()['count']
-        print(f"📊 Total de rutas en la base de datos: {rutas_count}")
+        print(f"Total de rutas en la base de datos: {rutas_count}")
         
         if rutas_count > 0:
             cursor.execute("SELECT nombre, recorrido FROM rutas LIMIT 5")
             sample_rutas = cursor.fetchall()
-            print("📋 Primeras 5 rutas:")
+            print("Primeras 5 rutas:")
             for ruta in sample_rutas:
                 print(f"  - {ruta['nombre']}: {ruta['recorrido']}")
         else:
-            print("⚠️ No hay rutas en la base de datos")
+            print("No hay rutas en la base de datos")
         
         conn.close()
     
     verificar_rutas_debug()
     
 except Exception as e:
-    print(f"❌ Error en debug de rutas: {e}")
+    print(f"Error en debug de rutas: {e}")
 
 print("=" * 50)
 # ===== FIN DE LÍNEAS DE DEBUG =====

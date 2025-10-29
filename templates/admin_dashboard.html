@@ -198,13 +198,13 @@
         <div class="status-legend">
             <h3>Estado de las Asignaciones:</h3>
             <div class="legend-item">
-                <span class="status-indicator status-active">🔄 Activa</span> - En ventana de tiempo (30 min antes/después)
+                <span class="status-indicator status-active">Activa</span> - En ventana de tiempo (30 min antes/después)
             </div>
             <div class="legend-item">
-                <span class="status-indicator status-upcoming">⏰ Próxima</span> - Programada para el futuro
+                <span class="status-indicator status-upcoming">Próxima</span> - Programada para el futuro
             </div>
             <div class="legend-item">
-                <span class="status-indicator status-completed">✅ Completada</span> - Ya pasó su horario
+                <span class="status-indicator status-completed">Completada</span> - Ya pasó su horario
             </div>
         </div>
 
@@ -227,7 +227,7 @@
                     {% for asignacion in asignaciones %}
                     <tr data-fecha="{{ asignacion.fecha }}" data-hora="{{ asignacion.hora_salida }}">
                         <td>
-                            <span class="status-indicator">⏳ Calculando...</span>
+                            <span class="status-indicator">Calculando...</span>
                         </td>
                         <td>{{ asignacion.fecha }}</td>
                         <td>{{ asignacion.hora_salida_12h if asignacion.hora_salida_12h else asignacion.hora_salida }}</td>
@@ -280,21 +280,21 @@
                 
                 const statusSpan = row.querySelector('.status-indicator');
                 
-                if (diffMinutes >= -30 && diffMinutes <= 30) {
+                    if (diffMinutes >= -30 && diffMinutes <= 30) {
                     // Activa
-                    row.classList.add('row-active');
-                    statusSpan.className = 'status-indicator status-active';
-                    statusSpan.textContent = '🔄 Activa';
+                    	row.classList.add('row-active');
+                    	statusSpan.className = 'status-indicator status-active';
+                    	statusSpan.textContent = 'Activa';
                 } else if (diffMinutes > 30) {
                     // Próxima
-                    row.classList.add('row-upcoming');
-                    statusSpan.className = 'status-indicator status-upcoming';
-                    statusSpan.textContent = '⏰ Próxima';
+                    	row.classList.add('row-upcoming');
+                    	statusSpan.className = 'status-indicator status-upcoming';
+                    	statusSpan.textContent = 'Próxima';
                 } else {
                     // Completada
-                    row.classList.add('row-completed');
-                    statusSpan.className = 'status-indicator status-completed';
-                    statusSpan.textContent = '✅ Completada';
+                    	row.classList.add('row-completed');
+                    	statusSpan.className = 'status-indicator status-completed';
+                    	statusSpan.textContent = 'Completada';
                 }
             });
         }

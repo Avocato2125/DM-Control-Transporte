@@ -20,7 +20,7 @@ def limpiar_rutas():
     """
     Elimina todas las rutas existentes para poder insertar las nuevas
     """
-    print("🧹 Limpiando rutas existentes...")
+    print("Limpiando rutas existentes...")
     
     conn = None
     try:
@@ -29,17 +29,17 @@ def limpiar_rutas():
         
         # Primero eliminar asignaciones que dependen de rutas
         cursor.execute("DELETE FROM asignaciones")
-        print("🗑️ Asignaciones eliminadas")
+        print("Asignaciones eliminadas")
         
         # Luego eliminar rutas
         cursor.execute("DELETE FROM rutas")
-        print("🗑️ Rutas eliminadas")
+        print("Rutas eliminadas")
         
         conn.commit()
-        print("✅ Limpieza completada")
+        print("Limpieza completada")
         
     except Exception as e:
-        print(f"❌ ERROR al limpiar: {e}")
+        print(f"ERROR al limpiar: {e}")
         if conn:
             conn.rollback()
     finally:
@@ -50,7 +50,7 @@ def insertar_rutas():
     """
     Inserta las rutas en la base de datos PostgreSQL.
     """
-    print("🚀 Iniciando inserción de rutas...")
+    print("Iniciando inserción de rutas...")
     
     rutas = [
         ("NUEVA ROSITA", "LIBRAMIENTO SUR - PLAZA CALLE 9"),
@@ -104,13 +104,13 @@ def insertar_rutas():
         for ruta in rutas:
             cursor.execute("INSERT INTO rutas (nombre, recorrido) VALUES (%s, %s)", ruta)
             rutas_insertadas += 1
-            print(f"✓ Ruta '{ruta[0]} - {ruta[1]}' insertada")
+            print(f"Ruta '{ruta[0]} - {ruta[1]}' insertada")
 
         conn.commit()
-        print(f"🎉 {rutas_insertadas} rutas insertadas exitosamente")
+        print(f"{rutas_insertadas} rutas insertadas exitosamente")
 
     except Exception as e:
-        print(f"❌ ERROR al insertar rutas: {e}")
+        print(f"ERROR al insertar rutas: {e}")
         if conn:
             conn.rollback()
     finally:
@@ -118,7 +118,7 @@ def insertar_rutas():
             conn.close()
 
 if __name__ == "__main__":
-    print("📋 Ejecutando actualización de rutas...")
+    print("Ejecutando actualización de rutas...")
     limpiar_rutas()
     insertar_rutas()
-    print("✅ Proceso completado")
+    print("Proceso completado")
