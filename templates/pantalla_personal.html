@@ -4,8 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DM CONTROL - Salidas de Personal</title>
-    <meta http-equiv="refresh" content="15"> 
-
+    <!-- La recarga automática se controla por JavaScript para poder pausar/reanudar desde la UI -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/pantalla_personal.css') }}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='IMG/dm_logo corto.png') }}">
 
@@ -49,8 +48,9 @@
     </header>
 
     <div class="current-info">
-        <span>{{ fecha_actual }}</span>
-        <span>{{ hora_actual }}</span>
+        <span id="fechaActual">{{ fecha_actual }}</span>
+        <button id="toggleAutoRefresh" class="refresh-btn" title="Pausar/Reanudar actualización automática">Pausar actualización</button>
+        <span id="horaActual">{{ hora_actual }}</span>
     </div>
 
     <div class="main-display">
@@ -125,6 +125,62 @@
         Actualizado automáticamente cada 15 segundos
     </footer>
     <script>
+        (function() {
+            const AUTO_REFRESH_KEY = 'pantalla_auto_refresh';
+            const REFRESH_INTERVAL_MS = 15000; // 15 segundos
+
+            const btn = document.getElementById('toggleAutoRefresh');
+
+            let intervalId = null;
+
+            function isAutoRefreshEnabled() {
+                const val = localStorage.getItem(AUTO_REFRESH_KEY);
+                if (val === null) return true; // por defecto activado
+                return val === 'on';
+            }
+
+            function setAutoRefreshEnabled(enabled) {
+                localStorage.setItem(AUTO_REFRESH_KEY, enabled ? 'on' : 'off');
+                updateButtonLabel(enabled);
+                if (enabled) startAutoRefresh(); else stopAutoRefresh();
+            }
+
+            function updateButtonLabel(enabled) {
+                if (!btn) return;
+                btn.textContent = enabled ? 'Pausar actualización' : 'Reanudar actualización';
+                btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+            }
+
+            function startAutoRefresh() {
+                stopAutoRefresh();
+                intervalId = setInterval(() => {
+                    window.location.reload();
+                }, REFRESH_INTERVAL_MS);
+            }
+
+            function stopAutoRefresh() {
+                if (intervalId) {
+                    clearInterval(intervalId);
+                    intervalId = null;
+                }
+            }
+
+            // Inicializar según el estado guardado
+            const enabled = isAutoRefreshEnabled();
+            updateButtonLabel(enabled);
+            if (enabled) startAutoRefresh();
+
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    const currentlyEnabled = isAutoRefreshEnabled();
+                    setAutoRefreshEnabled(!currentlyEnabled);
+                });
+            }
+
+            window.addEventListener('beforeunload', () => {
+                stopAutoRefresh();
+            });
+        })();
     </script>
 </body>
 </html>
