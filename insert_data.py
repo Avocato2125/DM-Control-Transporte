@@ -93,6 +93,8 @@ def insertar_rutas():
         ("MANANTIALES", "ALLENDE"),
         ("MANANTIALES", "MANANTIALES"), 
         ("SAN JOSE DE AURA", "SAN JOSE DE AURA"),
+        ("ESTACA", "ESTACA"),
+        ("LOMAS", "LOMAS"),
     ]
 
     conn = None
